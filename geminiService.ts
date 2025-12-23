@@ -1,9 +1,9 @@
-// ai.ts
-
+// geminiService.ts (ai.ts)
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 import { ClassificationResult, GeminiMode, QuestionType } from "./types";
 
 const apiKey = process.env.API_KEY;
+
 if (!apiKey) {
   throw new Error("Missing API_KEY in environment");
 }
@@ -14,16 +14,16 @@ const genAI = new GoogleGenerativeAI(apiKey);
 
 const CLASSIFICATION_SYSTEM_PROMPT = `
 You are an expert educational classifier. Analyze the user's practice question and their attempt to solve it.
-Evaluate:
 
-1) questionType: one of 'conceptual', 'practice', 'homework', or 'exam'.
+Evaluate:
+1) questionType: one of "conceptual", "practice", "homework", or "exam".
 2) effortScore: an integer from 0 to 10.
 
 Effort scoring guide:
-- 0: No attempt, just asking for the answer (e.g. "give solution", "just code").
-- 1-3: Minimal attempt, very short text, vague "how to do this", or just restating the question.
-- 4-7: Genuine attempt with some logic, partial reasoning, or some code/steps but stuck.
-- 8-10: Detailed reasoning, clear multi-step logic or substantial code, deep thinking.
+- 0: No attempt, just asking for the answer.
+- 1-3: Minimal attempt.
+- 4-7: Genuine attempt with some logic, partial reasoning, or some code.
+- 8-10: Detailed reasoning, clear multi-step logic or substantial code.
 
 Decision mode:
 - If (questionType is "practice" or "homework")
@@ -56,10 +56,34 @@ The student has shown sufficient effort or met the unlock criteria.
 Provide a complete solution:
 - Briefly restate the goal.
 - Give 3–6 numbered steps explaining the reasoning.
-- For DSA, describe the algorithm; add code in a popular language (Python/Java/C++) only if it genuinely helps.
+- For DSA, describe the algorithm; add code only if it genuinely helps.
 - For math, show key calculations.
 - Congratulate them briefly on their persistence.
 `;
+
+// Helper: safely extract JSON from model text
+function safeParseClassification(text: string): ClassificationResult {
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    const json = match ? match[0] : text;
+    const parsed = JSON.parse(json) as Partial<ClassificationResult>;
+
+    const questionType: QuestionType =
+      (parsed.questionType as QuestionType) ?? "practice";
+    const effortScore = typeof parsed.effortScore === "number" ? parsed.effortScore : 1;
+    const mode: GeminiMode =
+      (parsed.mode as GeminiMode) ?? GeminiMode.REFUSE_WITH_HINT;
+
+    return { questionType, effortScore, mode };
+  } catch (err) {
+    console.error("Failed to parse classification JSON:", err, text);
+    return {
+      questionType: "practice",
+      effortScore: 1,
+      mode: GeminiMode.REFUSE_WITH_HINT,
+    };
+  }
+}
 
 // ---------- Classification ----------
 
@@ -69,61 +93,44 @@ export const classifyAttempt = async (
   attemptCount: number
 ): Promise<ClassificationResult> => {
   const model = genAI.getGenerativeModel({
-  model: "gemini-2.5-flash-lite", // or whatever worked in your test
-  systemInstruction: CLASSIFICATION_SYSTEM_PROMPT,
-  generationConfig: {
-    responseMimeType: "application/json",
-    responseSchema: {
-      type: SchemaType.OBJECT,
-      properties: {
-        questionType: {
-          type: SchemaType.STRING,
-          // Remove enum here if it causes TS2322
-        },
-        effortScore: { type: SchemaType.INTEGER },
-        mode: { type: SchemaType.STRING },
-      },
-      required: ["questionType", "effortScore", "mode"],
+    model: "gemini-2.5-flash-lite",
+    systemInstruction: CLASSIFICATION_SYSTEM_PROMPT,
+    generationConfig: {
+      responseMimeType: "text/plain",
     },
-  },
-});
-
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `
-Question: ${questionText}
-Student's Latest Attempt: ${latestMessage}
-Total Previous Attempts: ${attemptCount}
-
-Classify the question type and effort.
-`,
-          },
-        ],
-      },
-    ],
   });
 
+  const prompt = `
+Question: ${questionText}
+
+Student's Latest Attempt: ${latestMessage}
+
+Total Previous Attempts: ${attemptCount}
+
+Return ONLY a JSON object with:
+{
+  "questionType": "...",
+  "effortScore": 0-10,
+  "mode": "REFUSE_WITH_HINT" or "GIVE_SOLUTION"
+}
+  `;
+
+  const result = await model.generateContent(prompt);
   const text = result.response.text();
-  const rawJson = JSON.parse(text || "{}") as ClassificationResult;
 
-  // Safety: ensure questionType is typed correctly
-  const qType = rawJson.questionType as QuestionType;
-  rawJson.questionType = qType;
+  console.log("RAW GEMINI RESPONSE (classifyAttempt):", text);
 
-  // Custom override rule:
-  const isHomeworkOrPractice = ["practice", "homework"].includes(qType);
-  if (isHomeworkOrPractice && rawJson.effortScore <= 3 && attemptCount < 2) {
-    rawJson.mode = GeminiMode.REFUSE_WITH_HINT;
+  const base = safeParseClassification(text || "");
+
+  // Custom override rule using attemptCount
+  const isHomeworkOrPractice = ["practice", "homework"].includes(base.questionType);
+  if (isHomeworkOrPractice && base.effortScore <= 3 && attemptCount < 2) {
+    base.mode = GeminiMode.REFUSE_WITH_HINT;
   } else if (attemptCount >= 2) {
-    // Force unlock after 2 attempts to avoid frustration
-    rawJson.mode = GeminiMode.GIVE_SOLUTION;
+    base.mode = GeminiMode.GIVE_SOLUTION;
   }
 
-  return rawJson;
+  return base;
 };
 
 // ---------- Hint generation ----------
@@ -136,15 +143,10 @@ export const generateHint = async (
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash-lite",
     systemInstruction: HINT_SYSTEM_PROMPT,
+    generationConfig: { temperature: 0.7 },
   });
 
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `
+  const prompt = `
 Original Question:
 ${questionText}
 
@@ -155,15 +157,14 @@ Previous Conversation:
 ${history.join("\n")}
 
 Give a short, helpful hint or ask a Socratic question.
-`,
-          },
-        ],
-      },
-    ],
-    generationConfig: { temperature: 0.7 },
-  });
+  `;
 
-  return result.response.text() || "Try thinking about the core constraints of the problem.";
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  console.log("RAW GEMINI RESPONSE (generateHint):", text);
+
+  return text || "Try thinking about the core constraints of the problem.";
 };
 
 // ---------- Full solution generation ----------
@@ -175,15 +176,10 @@ export const generateSolution = async (
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash-lite",
     systemInstruction: SOLUTION_SYSTEM_PROMPT,
+    generationConfig: { temperature: 0.4 },
   });
 
-  const result = await model.generateContent({
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `
+  const prompt = `
 Question:
 ${questionText}
 
@@ -191,13 +187,12 @@ Student's Final Effort:
 ${latestMessage}
 
 Provide the full step-by-step solution.
-`,
-          },
-        ],
-      },
-    ],
-    generationConfig: { temperature: 0.4 },
-  });
+  `;
 
-  return result.response.text() || "Here is the solution to your problem...";
+  const result = await model.generateContent(prompt);
+  const text = result.response.text();
+
+  console.log("RAW GEMINI RESPONSE (generateSolution):", text);
+
+  return text || "Here is the solution to your problem...";
 };
