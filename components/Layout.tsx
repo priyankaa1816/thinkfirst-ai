@@ -17,7 +17,7 @@ const Layout: React.FC<LayoutProps> = ({ children, user }) => {
       </main>
 
       <footer className="py-6 border-t border-slate-200 text-center text-slate-500 text-sm">
-        &copy; {new Date().getFullYear()} ThinkFirst AI - Built for GDG Hackathon
+        &copy; {new Date().getFullYear()} ThinkFirst AI - All rights reserved.
       </footer>
     </div>
   );

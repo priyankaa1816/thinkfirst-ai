@@ -36,7 +36,7 @@ const Home: React.FC = () => {
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <div className="max-w-2xl">
         <div className="inline-block p-3 bg-indigo-50 rounded-2xl mb-6">
-          <span className="text-indigo-600 font-semibold text-sm">GDG Hackathon Special Edition</span>
+          <span className="text-indigo-600 font-semibold text-sm">Brought to you by HackSquad</span>
         </div>
         <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 mb-6 tracking-tight">
           Hints before answers.<br/>
