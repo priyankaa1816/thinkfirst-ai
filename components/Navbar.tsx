@@ -1,13 +1,15 @@
-
 import React from 'react';
-import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { signOut, User } from 'firebase/auth';
 import { auth } from '../firebase';
-import { signOut } from 'firebase/auth';
 
-const Navbar: React.FC = () => {
+interface NavbarProps {
+  user: User | null;
+}
+
+const Navbar: React.FC<NavbarProps> = ({ user }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const user = auth.currentUser;
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -21,32 +23,52 @@ const Navbar: React.FC = () => {
           <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-xl">T</span>
           </div>
-          <span className="font-bold text-xl tracking-tight text-slate-800">ThinkFirst <span className="text-indigo-600">AI</span></span>
+          <span className="font-bold text-xl tracking-tight text-slate-800">
+            ThinkFirst <span className="text-indigo-600">AI</span>
+          </span>
         </Link>
 
         {user && (
           <div className="flex items-center space-x-6">
-            <Link 
-              to="/dashboard" 
-              className={`text-sm font-medium ${location.pathname === '/dashboard' ? 'text-indigo-600' : 'text-slate-600 hover:text-indigo-500'}`}
+            <Link
+              to="/dashboard"
+              className={`text-sm font-medium ${
+                location.pathname === '/dashboard'
+                  ? 'text-indigo-600'
+                  : 'text-slate-600 hover:text-indigo-500'
+              }`}
             >
               Start Practice
             </Link>
-            <Link 
-              to="/progress" 
-              className={`text-sm font-medium ${location.pathname === '/progress' ? 'text-indigo-600' : 'text-slate-600 hover:text-indigo-500'}`}
+
+            <Link
+              to="/progress"
+              className={`text-sm font-medium ${
+                location.pathname === '/progress'
+                  ? 'text-indigo-600'
+                  : 'text-slate-600 hover:text-indigo-500'
+              }`}
             >
               My Progress
             </Link>
-            <button 
+
+            <button
               onClick={handleLogout}
               className="text-sm font-medium text-slate-400 hover:text-red-500 transition-colors"
             >
               Logout
             </button>
-            <img 
-              src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName}`} 
-              alt="Avatar" 
+
+            {/* ✅ GOOGLE PROFILE IMAGE FIX */}
+            <img
+              src={
+                user.photoURL ??
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  user.displayName || 'User'
+                )}`
+              }
+              alt="Profile"
+              referrerPolicy="no-referrer"
               className="w-8 h-8 rounded-full border border-slate-200"
             />
           </div>

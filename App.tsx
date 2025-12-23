@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged, User } from 'firebase/auth';
@@ -19,6 +18,7 @@ const App: React.FC = () => {
       setUser(currentUser);
       setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
@@ -35,21 +35,12 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      <Layout>
+      <Layout user={user}>
         <Routes>
           <Route path="/" element={user ? <Navigate to="/dashboard" /> : <Home />} />
-          <Route 
-            path="/dashboard" 
-            element={user ? <Dashboard /> : <Navigate to="/" />} 
-          />
-          <Route 
-            path="/session/:id" 
-            element={user ? <SessionChat /> : <Navigate to="/" />} 
-          />
-          <Route 
-            path="/progress" 
-            element={user ? <Progress /> : <Navigate to="/" />} 
-          />
+          <Route path="/dashboard" element={user ? <Dashboard /> : <Navigate to="/" />} />
+          <Route path="/session/:id" element={user ? <SessionChat /> : <Navigate to="/" />} />
+          <Route path="/progress" element={user ? <Progress /> : <Navigate to="/" />} />
         </Routes>
       </Layout>
     </Router>
