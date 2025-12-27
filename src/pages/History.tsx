@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { Session } from '../types';
+import { Session } from '..';
 import { Link } from 'react-router-dom';
 
 const Progress: React.FC = () => {

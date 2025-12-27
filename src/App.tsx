@@ -6,8 +6,8 @@ import { auth } from './firebase';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
-import SessionChat from './pages/Session';
-import Progress from './pages/Progress';
+import SessionChat from '../pages/Session';
+import Progress from './pages/History';
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);

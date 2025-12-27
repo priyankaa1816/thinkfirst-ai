@@ -1,6 +1,6 @@
 // geminiService.ts (ai.ts)
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import { ClassificationResult, GeminiMode, QuestionType } from "./types";
+import { ClassificationResult, GeminiMode, QuestionType } from "../../../src";
 
 const apiKey = process.env.API_KEY;
 

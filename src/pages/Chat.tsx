@@ -14,7 +14,10 @@ import {
   where
 } from 'firebase/firestore';
 import { Session, ChatMessage, QuestionType, GeminiMode, EffortLevel } from '../types';
-import { classifyAttempt, generateHint, generateSolution } from '../geminiService';
+
+// ✅ Backend URL
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 
+  'http://localhost:5001/YOUR-PROJECT-ID/us-central1/chat';
 
 const SessionChat: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -50,21 +53,26 @@ const SessionChat: React.FC = () => {
     };
     fetchStats();
 
-    // Sync Session Data
+    // ✅ FIXED: Sync Session Data
     const unsubSession = onSnapshot(doc(db, 'sessions', id), docSnap => {
       if (docSnap.exists()) {
-        const data = docSnap.data() as Session;
-        setSession({ id: docSnap.id, ...data });
+        setSession({ 
+          ...docSnap.data(), 
+          id: docSnap.id 
+        } as Session);
       }
     });
 
-    // Sync Messages
+    // ✅ FIXED: Sync Messages
     const qMessages = query(
       collection(db, 'sessions', id, 'messages'),
       orderBy('timestamp', 'asc')
     );
     const unsubMessages = onSnapshot(qMessages, snap => {
-      const msgs = snap.docs.map(d => ({ id: d.id, ...(d.data() as ChatMessage) }));
+      const msgs = snap.docs.map(d => ({ 
+        ...d.data(), 
+        id: d.id 
+      })) as ChatMessage[];
       setMessages(msgs);
     });
 
@@ -78,6 +86,7 @@ const SessionChat: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // ✅ UPDATED: Call backend instead of Gemini directly
   const handleSend = async (forcedMode?: 'HINT' | 'SOLUTION') => {
     if ((!input.trim() && !forcedMode) || !session || !id || sending) return;
 
@@ -98,63 +107,54 @@ const SessionChat: React.FC = () => {
         timestamp: Date.now()
       });
 
-      // 2. Process with Gemini
-      console.log('[SessionChat] Calling classifyAttempt...');
-      const classification = await classifyAttempt(
-        session.questionText,
-        userText,
-        session.attemptsCount
-      );
-      console.log('[SessionChat] Classification result:', classification);
+      // 2. Call Backend API
+      console.log('[SessionChat] Calling backend...');
+      const response = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userText,
+          conversationHistory: messages.slice(-10).map(m => ({
+            role: m.role,
+            text: m.text,
+          })),
+          attemptNumber: session.attemptsCount + 1,
+        }),
+      });
 
-      let aiResponseText = '';
-      let replyType: 'HINT' | 'SOLUTION' = 'HINT';
-
-      if (classification.mode === GeminiMode.REFUSE_WITH_HINT && !forcedMode) {
-        console.log('[SessionChat] Generating hint...');
-        aiResponseText = await generateHint(
-          session.questionText,
-          userText,
-          messages.map(m => `${m.role}: ${m.text}`)
-        );
-        replyType = 'HINT';
-      } else {
-        console.log('[SessionChat] Generating solution...');
-        aiResponseText = await generateSolution(session.questionText, userText);
-        replyType = 'SOLUTION';
+      if (!response.ok) {
+        throw new Error(`Backend error: ${response.status}`);
       }
 
-      console.log('[SessionChat] AI Response Text:', aiResponseText);
-      console.log('[SessionChat] Reply Type:', replyType);
+      const aiResponse = await response.json();
+      console.log('[SessionChat] Backend response:', aiResponse);
 
-      // 3. Update Session State
+      // 3. Save AI Response
+      await addDoc(collection(db, 'sessions', id, 'messages'), {
+        role: 'ai',
+        text: aiResponse.text,
+        timestamp: Date.now(),
+        replyType: aiResponse.isSolution ? 'SOLUTION' : 'HINT',
+        effortScore: session.attemptsCount + 1,
+      });
+
+      // 4. Update Session State
       const newAttemptsCount = session.attemptsCount + 1;
       const updateData: Partial<Session> = {
         attemptsCount: newAttemptsCount,
-        lastEffortScore: classification.effortScore,
-        questionType: classification.questionType
       };
 
-      if (replyType === 'SOLUTION' && !session.unlocked) {
+      if (aiResponse.isSolution && !session.unlocked) {
         updateData.unlocked = true;
         updateData.unlockedAt = Date.now();
       }
 
-      console.log('[SessionChat] Updating session doc with:', updateData);
+      console.log('[SessionChat] Updating session:', updateData);
       await updateDoc(doc(db, 'sessions', id), updateData as any);
 
-      // 4. Save AI Response
-      const aiDocRef = await addDoc(collection(db, 'sessions', id, 'messages'), {
-        role: 'ai',
-        text: aiResponseText,
-        timestamp: Date.now(),
-        replyType,
-        effortScore: classification.effortScore
-      });
-      console.log('[SessionChat] AI message saved with ID:', aiDocRef.id);
     } catch (error) {
-      console.error('Chat error', error);
-      alert('Error processing message. Check console for details.');
+      console.error('Chat error:', error);
+      alert('Error processing message. Check console and backend logs.');
     } finally {
       setSending(false);
     }
