@@ -1,6 +1,6 @@
 
 {
   "name": "ThinkFirst AI",
-  "description": "An AI tutor for DSA and Math that rewards effort. Get hints first, unlock solutions only after showing your work.",
+  "description": "A smart learning assistant that provides hints before solutions for technical questions, while serving as a general AI chatbot for daily tasks.",
   "requestFramePermissions": []
 }

@@ -1,78 +1,50 @@
+
 import React from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { signOut, User } from 'firebase/auth';
+import { Link, useLocation } from 'react-router-dom';
 import { auth } from '../firebase';
 
-interface NavbarProps {
-  user: User | null;
-}
-
-const Navbar: React.FC<NavbarProps> = ({ user }) => {
+const Navbar: React.FC = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate('/');
-  };
+  
+  const navItems = [
+    { label: 'Dashboard', path: '/dashboard' },
+    { label: 'History', path: '/history' },
+  ];
 
   return (
-    <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center space-x-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-xl">T</span>
+    <nav className="bg-white shadow-sm border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <div className="flex">
+            <Link to="/dashboard" className="flex-shrink-0 flex items-center">
+              <span className="text-xl font-bold text-indigo-600">ThinkFirst AI</span>
+            </Link>
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              {navItems.map((item) => (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
+                    location.pathname === item.path
+                      ? 'border-indigo-500 text-gray-900'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
           </div>
-          <span className="font-bold text-xl tracking-tight text-slate-800">
-            ThinkFirst <span className="text-indigo-600">AI</span>
-          </span>
-        </Link>
-
-        {user && (
-          <div className="flex items-center space-x-6">
-            <Link
-              to="/dashboard"
-              className={`text-sm font-medium ${
-                location.pathname === '/dashboard'
-                  ? 'text-indigo-600'
-                  : 'text-slate-600 hover:text-indigo-500'
-              }`}
+          <div className="flex items-center">
+             <span className="text-sm text-gray-500 mr-4 hidden md:block">{auth.currentUser?.email}</span>
+             <button
+              onClick={() => auth.signOut()}
+              className="ml-4 px-3 py-1 text-sm text-gray-700 hover:text-indigo-600 font-medium"
             >
-              Start Practice
-            </Link>
-
-            <Link
-              to="/progress"
-              className={`text-sm font-medium ${
-                location.pathname === '/progress'
-                  ? 'text-indigo-600'
-                  : 'text-slate-600 hover:text-indigo-500'
-              }`}
-            >
-              My Progress
-            </Link>
-
-            <button
-              onClick={handleLogout}
-              className="text-sm font-medium text-slate-400 hover:text-red-500 transition-colors"
-            >
-              Logout
+              Sign Out
             </button>
-
-            {/* ✅ GOOGLE PROFILE IMAGE FIX */}
-            <img
-              src={
-                user.photoURL ??
-                `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                  user.displayName || 'User'
-                )}`
-              }
-              alt="Profile"
-              referrerPolicy="no-referrer"
-              className="w-8 h-8 rounded-full border border-slate-200"
-            />
           </div>
-        )}
+        </div>
       </div>
     </nav>
   );

@@ -1,24 +1,14 @@
+// src/types/index.ts
 
-export type QuestionType = 'conceptual' | 'practice' | 'homework' | 'exam';
-
-export type EffortLevel = 'Low' | 'Medium' | 'High';
-
-export interface Attempt {
-  text: string;
-  effortScore: number;
-  timestamp: number;
-}
-
-export interface Session {
+export interface ChatSession {
   id: string;
   userId: string;
-  questionText: string;
+  title: string;
+  questionText?: string;
   createdAt: number;
-  unlocked: boolean;
-  unlockedAt?: number;
-  questionType?: QuestionType;
-  attemptsCount: number;
-  lastEffortScore?: number;
+  updatedAt: number;
+  mode?: 'learning' | 'general';
+  messageCount: number;
 }
 
 export interface ChatMessage {
@@ -26,17 +16,18 @@ export interface ChatMessage {
   role: 'user' | 'ai';
   text: string;
   timestamp: number;
-  replyType?: 'HINT' | 'SOLUTION';
-  effortScore?: number;
+  createdAt: number;
+  senderId: string;  // ← ADD THIS LINE
+  metadata?: {
+    isHint?: boolean;
+    isSolution?: boolean;
+  };
+  mode?: 'learning' | 'general';
 }
 
-export enum GeminiMode {
-  REFUSE_WITH_HINT = 'REFUSE_WITH_HINT',
-  GIVE_SOLUTION = 'GIVE_SOLUTION'
-}
-
-export interface ClassificationResult {
-  questionType: QuestionType;
-  effortScore: number;
-  mode: GeminiMode;
+export interface UserProgress {
+  totalQuestions: number;
+  hintsUsed: number;
+  solutionsUnlocked: number;
+  currentStreak: number;
 }
