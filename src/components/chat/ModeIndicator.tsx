@@ -2,7 +2,7 @@
 import React from 'react';
 
 interface ModeIndicatorProps {
-  mode: 'learning' | 'general';
+  mode: 'learning' | 'chat';
 }
 
 const ModeIndicator: React.FC<ModeIndicatorProps> = ({ mode }) => {

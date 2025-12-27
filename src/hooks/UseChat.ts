@@ -63,10 +63,12 @@ export const useChat = (sessionId: string) => {
       setMessages(prev => [...prev, { ...userMessage, id: userMessageId }]);
 
       // Call backend for AI response
-      const backendUrl = import.meta.env.VITE_BACKEND_URL;
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:5001/think-first-ai/us-central1/chat';
       
-      if (backendUrl) {
-        // Production: Call Firebase Function
+      try {
+        // Detect if message contains code patterns
+        const hasCode = /```|function|const|let|var|class|import|export|def|print|return/i.test(text);
+        // Call Firebase Function with correct payload
         const response = await fetch(backendUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -76,17 +78,19 @@ export const useChat = (sessionId: string) => {
               role: m.role,
               text: m.text
             })),
-            attemptNumber: messages.filter(m => m.role === 'user').length + 1
+            hasCode: hasCode  // ← ADDED THIS
           })
         });
 
         if (!response.ok) {
-          throw new Error('Backend error');
+          const errorText = await response.text();
+          console.error('Backend error details:', errorText);
+          throw new Error(`Backend error: ${response.status}`);
         }
 
         const aiResponse = await response.json();
 
-        // Add AI response
+        // Add AI response with smart mode detection
         const aiMessage: Omit<ChatMessage, 'id'> = {
           role: 'ai',
           text: aiResponse.text,
@@ -94,42 +98,47 @@ export const useChat = (sessionId: string) => {
           senderId: 'ai',
           createdAt: Date.now(),
           metadata: {
-            isHint: aiResponse.isHint || false,
-            isSolution: aiResponse.isSolution || false,
+            isHint: aiResponse.metadata?.isHint ?? false,
+            isSolution: aiResponse.metadata?.isSolution ?? false,
+            detectedIntent: aiResponse.metadata?.detectedIntent ?? 'general_chat'
           },
-          mode: aiResponse.mode === 'REFUSE_WITH_HINT' ? 'learning' : 'general'
+          mode: aiResponse.mode || 'chat'
         };
 
         const aiMessageId = await addMessage(sessionId, aiMessage);
         setMessages(prev => [...prev, { ...aiMessage, id: aiMessageId }]);
 
-        // Update session mode
-        const newMode = aiResponse.mode === 'REFUSE_WITH_HINT' ? 'learning' : 'general';
+        // Update session mode based on AI detection
+        const newMode = aiResponse.mode || 'chat';
         await updateSession(sessionId, { mode: newMode });
         setSession(prev => prev ? { ...prev, mode: newMode } : null);
 
-        // Track progress
-        if (aiResponse.isHint) {
+        // Track progress for learning interactions
+        if (aiResponse.metadata?.isHint) {
           await incrementProgress(auth.currentUser.uid, 'hintsUsed');
         }
-        if (aiResponse.isSolution) {
+        if (aiResponse.metadata?.isSolution) {
           await incrementProgress(auth.currentUser.uid, 'solutionsUnlocked');
         }
-      } else {
-        // Development: Mock AI response
-        console.warn('VITE_BACKEND_URL not set. Using mock response.');
+
+      } catch (backendError) {
+        console.error('Backend call failed:', backendError);
+        
+        // Fallback: Mock AI response if backend fails
+        console.warn('Using fallback mock response due to backend error.');
         
         const mockAiMessage: Omit<ChatMessage, 'id'> = {
           role: 'ai',
-          text: `Mock response to: "${text}"\n\nTo use real AI responses, set up your backend and configure VITE_BACKEND_URL in .env.local`,
+          text: `I'm having trouble connecting to my AI brain right now. 🤔\n\nYour question: "${text}"\n\nPlease make sure:\n1. Firebase Functions are deployed\n2. VITE_BACKEND_URL is set correctly\n3. Gemini API key is configured\n\nTry again in a moment!`,
           timestamp: Date.now(),
           senderId: 'ai',
           createdAt: Date.now(),
           metadata: {
             isHint: false,
             isSolution: false,
+            detectedIntent: 'error'
           },
-          mode: 'general'
+          mode: 'chat'
         };
 
         const mockMessageId = await addMessage(sessionId, mockAiMessage);
@@ -139,13 +148,19 @@ export const useChat = (sessionId: string) => {
     } catch (error) {
       console.error('Error sending message:', error);
       
-      // Add error message
+      // Add user-friendly error message
       const errorMessage: Omit<ChatMessage, 'id'> = {
         role: 'ai',
-        text: 'Sorry, I encountered an error processing your message. Please try again.',
+        text: 'Sorry, I encountered an unexpected error. Please check your internet connection and try again. 🔄',
         timestamp: Date.now(),
         senderId: 'ai',
         createdAt: Date.now(),
+        metadata: {
+          isHint: false,
+          isSolution: false,
+          detectedIntent: 'error'
+        },
+        mode: 'chat'
       };
 
       const errorMessageId = await addMessage(sessionId, errorMessage);

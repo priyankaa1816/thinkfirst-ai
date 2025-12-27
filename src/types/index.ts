@@ -1,33 +1,27 @@
-// src/types/index.ts
-
+// src/types.ts
 export interface ChatSession {
   id: string;
   userId: string;
-  title: string;
-  questionText?: string;
+  title?: string;
+  mode: 'learning' | 'chat';
+  participants: string[];
+  lastMessage?: ChatMessage;
   createdAt: number;
-  updatedAt: number;
-  mode?: 'learning' | 'general';
-  messageCount: number;
+  updatedAt: number;  // ← ADD THIS
+  messageCount: number;  // ← ADD THIS
 }
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'ai';
   text: string;
+  senderId: string;
+  role: 'user' | 'ai';
   timestamp: number;
   createdAt: number;
-  senderId: string;  // ← ADD THIS LINE
   metadata?: {
     isHint?: boolean;
     isSolution?: boolean;
+    detectedIntent?: string;
   };
-  mode?: 'learning' | 'general';
-}
-
-export interface UserProgress {
-  totalQuestions: number;
-  hintsUsed: number;
-  solutionsUnlocked: number;
-  currentStreak: number;
+  mode?: 'learning' | 'chat';
 }

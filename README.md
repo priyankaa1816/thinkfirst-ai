@@ -64,4 +64,4 @@ ThinkFirst AI is a specialized learning chatbot. It detects when you're asking t
 - **Backend:** Firebase Cloud Functions (TypeScript)
 - **Database:** Firebase Firestore
 - **Auth:** Firebase Auth
-- **AI:** Google Gemini API (`gemini-3-flash-preview`)
+- **AI:** Google Gemini API (`gemini-2.5-flash-lite`)
