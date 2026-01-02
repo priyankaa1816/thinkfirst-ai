@@ -435,3 +435,182 @@ export const getEffortStats = async (userId: string) => {
     throw error;
   }
 };
+// ========== 🧠 AMNESIA MODE TRACKING (NEW FUNCTIONS) ==========
+
+/**
+ * Save an amnesia reconstruction attempt
+ */
+export const saveAmnesiaAttempt = async (
+  userId: string,
+  attemptData: {
+    problemId: string;
+    originalSolution: string;
+    userReconstruction: string;
+    logicScore: number;
+    passed: boolean;
+    keyConcepts: string[];
+    missedConcepts: string[];
+    feedback: string;
+  }
+): Promise<string> => {
+  try {
+    // Save to amnesiaAttempts collection
+    const attemptRef = await addDoc(collection(db, 'amnesiaAttempts'), {
+      userId,
+      ...attemptData,
+      timestamp: Date.now(),
+    });
+
+    console.log('✅ Saved amnesia attempt:', attemptRef.id);
+    return attemptRef.id;
+  } catch (error) {
+    console.error('Error saving amnesia attempt:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get user's amnesia mode statistics
+ */
+export const getAmnesiaStats = async (userId: string) => {
+  try {
+    const progressRef = doc(db, 'progress', userId);
+    const progressSnap = await getDoc(progressRef);
+
+    if (!progressSnap.exists()) {
+      return {
+        totalAttempts: 0,
+        perfectStreak: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        averageScore: 0,
+        lastAttemptDate: null,
+      };
+    }
+
+    const progress = progressSnap.data();
+    
+    return {
+      totalAttempts: progress.amnesiaTotalAttempts || 0,
+      perfectStreak: progress.amnesiaPerfectStreak || 0,
+      currentStreak: progress.amnesiaCurrentStreak || 0,
+      bestStreak: progress.amnesiaBestStreak || 0,
+      averageScore: progress.amnesiaAverageScore || 0,
+      lastAttemptDate: progress.amnesiaLastAttemptDate || null,
+    };
+  } catch (error) {
+    console.error('Error getting amnesia stats:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update amnesia mode stats after an attempt
+ */
+export const updateAmnesiaStats = async (
+  userId: string,
+  logicScore: number,
+  passed: boolean
+): Promise<void> => {
+  try {
+    const progressRef = doc(db, 'progress', userId);
+    const progressSnap = await getDoc(progressRef);
+
+    const now = Date.now();
+
+    if (progressSnap.exists()) {
+      const progress = progressSnap.data();
+      
+      // Calculate new values
+      const totalAttempts = (progress.amnesiaTotalAttempts || 0) + 1;
+      const currentStreak = (progress.amnesiaCurrentStreak || 0);
+      const bestStreak = progress.amnesiaBestStreak || 0;
+      const previousAverage = progress.amnesiaAverageScore || 0;
+      
+      // Update streak
+      let newStreak = currentStreak;
+      let newBestStreak = bestStreak;
+      
+      if (passed) {
+        newStreak = currentStreak + 1;
+        newBestStreak = Math.max(newStreak, bestStreak);
+      } else {
+        newStreak = 0; // Reset streak on fail
+      }
+      
+      // Calculate rolling average score
+      const newAverage = Math.round(
+        ((previousAverage * (totalAttempts - 1)) + logicScore) / totalAttempts
+      );
+
+      await updateDoc(progressRef, {
+        amnesiaTotalAttempts: totalAttempts,
+        amnesiaCurrentStreak: newStreak,
+        amnesiaBestStreak: newBestStreak,
+        amnesiaPerfectStreak: passed ? increment(1) : (progress.amnesiaPerfectStreak || 0),
+        amnesiaAverageScore: newAverage,
+        amnesiaLastAttemptDate: now,
+        updatedAt: now,
+      });
+    } else {
+      // Create new progress document
+      await setDoc(progressRef, {
+        userId,
+        // Existing fields
+        totalQuestions: 0,
+        hintsUsed: 0,
+        solutionsUnlocked: 0,
+        currentStreak: 0,
+        problemsTriedBeforeSolution: 0,
+        hintsUsedThisWeek: 0,
+        solutionsAfterEffort: 0,
+        lastWeekReset: now,
+        effortScore: 0,
+        // Amnesia fields
+        amnesiaTotalAttempts: 1,
+        amnesiaCurrentStreak: passed ? 1 : 0,
+        amnesiaBestStreak: passed ? 1 : 0,
+        amnesiaPerfectStreak: passed ? 1 : 0,
+        amnesiaAverageScore: logicScore,
+        amnesiaLastAttemptDate: now,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    console.log('✅ Updated amnesia stats for user:', userId);
+  } catch (error) {
+    console.error('Error updating amnesia stats:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get recent amnesia attempts for a user
+ */
+export const getRecentAmnesiaAttempts = async (
+  userId: string,
+  limit: number = 10
+): Promise<any[]> => {
+  try {
+    const q = query(
+      collection(db, 'amnesiaAttempts'),
+      where('userId', '==', userId),
+      orderBy('timestamp', 'desc')
+    );
+    
+    const snapshot = await getDocs(q);
+    const attempts = snapshot.docs
+      .slice(0, limit)
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+    return attempts;
+  } catch (error) {
+    console.error('Error getting recent amnesia attempts:', error);
+    throw error;
+  }
+};
+

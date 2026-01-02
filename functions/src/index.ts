@@ -486,6 +486,127 @@ Attempt: ${attemptCount}
   }
 });
 
+  
+ // ==================== AMNESIA MODE: MEMORY RECONSTRUCTION CHECKER ====================
+
+// ==================== AMNESIA MODE: MEMORY RECONSTRUCTION CHECKER ====================
+
+// ==================== AMNESIA MODE: MEMORY RECONSTRUCTION CHECKER ====================
+
+// ==================== AMNESIA MODE: MEMORY RECONSTRUCTION CHECKER ====================
+
+export const checkMemoryReconstruction = functions.https.onCall(async (request) => {
+  try {
+    // Extract data from request
+    const data = request.data;
+    
+    console.log('📦 Raw request data:', JSON.stringify(data).substring(0, 200));
+    
+    const originalSolution = data.originalSolution;
+    const userReconstruction = data.userReconstruction;
+    
+    // Validation
+    if (!originalSolution || !userReconstruction) {
+      console.error('❌ Missing data:', {
+        hasOriginal: !!originalSolution,
+        hasReconstruction: !!userReconstruction,
+        dataKeys: Object.keys(data || {})
+      });
+      throw new functions.https.HttpsError(
+        'invalid-argument', 
+        'Missing originalSolution or userReconstruction'
+      );
+    }
+    
+    console.log('🧠 Checking memory reconstruction...');
+    console.log('Original length:', originalSolution.length);
+    console.log('Reconstruction length:', userReconstruction.length);
+    
+    const ai = new GoogleGenAI({ apiKey: getApiKey() });
+    
+    // Build the prompt for Gemini
+    const prompt = `You are a learning assessment AI. Compare these two solutions and check if the LOGIC and APPROACH are similar.
+
+**IGNORE THESE (Do NOT penalize for):**
+- Variable names (e.g., "nums" vs "array")
+- Exact syntax (e.g., "for i in range" vs "for(int i=0...)")
+- Code style and formatting
+- Comments
+- Language differences (Python vs JavaScript is OK)
+- Minor wording differences in explanations
+
+**ONLY CHECK THESE (Focus on):**
+- Core algorithm/approach used
+- Logic flow and reasoning
+- Key concepts applied (e.g., "uses hash map", "sliding window technique")
+- Problem-solving strategy
+- Correctness of the approach
+
+**Original Solution:**
+${originalSolution}
+
+**Student's Reconstruction:**
+${userReconstruction}
+
+Respond with a JSON object with these fields:
+- logicScore: number from 0-100 (how similar is the logic? 80+ is passing)
+- algorithmMatch: boolean (did they use the same core algorithm?)
+- keyConcepts: array of strings (concepts they got right, e.g., ["hash map", "O(n) time"])
+- missedConcepts: array of strings (important concepts they missed)
+- feedback: string (encouraging feedback - what they did well and what to improve)
+- passed: boolean (true if logicScore >= 80)`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            logicScore: { type: Type.NUMBER },
+            algorithmMatch: { type: Type.BOOLEAN },
+            keyConcepts: { 
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            missedConcepts: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            feedback: { type: Type.STRING },
+            passed: { type: Type.BOOLEAN }
+          },
+          required: ["logicScore", "algorithmMatch", "keyConcepts", "missedConcepts", "feedback", "passed"]
+        }
+      }
+    });
+    
+    const result = JSON.parse(response.text || '{}');
+    
+    console.log('✅ Memory check result:', {
+      score: result.logicScore,
+      passed: result.passed,
+      concepts: result.keyConcepts?.length || 0
+    });
+    
+    return {
+      ...result,
+      timestamp: new Date().toISOString()
+    };
+    
+  } catch (error: any) {
+    functions.logger.error("Memory Reconstruction Check Error:", error);
+    throw new functions.https.HttpsError('internal', error.message || 'Unknown error');
+  }
+});
+
+
+
+
+
+
+
 
 // import * as functions from "firebase-functions";
 // import * as admin from "firebase-admin";

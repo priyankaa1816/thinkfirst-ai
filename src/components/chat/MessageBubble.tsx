@@ -6,6 +6,8 @@ import { useTextToSpeech } from '../../hooks/useTexttoSpeech';
 
 interface MessageBubbleProps {
   message: ChatMessage;
+  onStartAmnesiaChallenge?: (content: string) => void; // 🆕 NEW PROP
+  isAmnesiaEnabled?: boolean; // 🆕 NEW PROP
 }
 
 // 🎨 Render message with syntax highlighting
@@ -61,7 +63,11 @@ const renderMessage = (text: string) => {
   return parts.length > 0 ? parts : text;
 };
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+const MessageBubble: React.FC<MessageBubbleProps> = ({ 
+  message, 
+  onStartAmnesiaChallenge, 
+  isAmnesiaEnabled = false 
+}) => {
   const isAi = message.role === 'ai';
   
   // 🆕 TEXT-TO-SPEECH HOOK
@@ -73,6 +79,13 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
       stop();
     } else {
       speak(message.text);
+    }
+  };
+
+  // 🆕 HANDLE AMNESIA CHALLENGE
+  const handleAmnesiaChallenge = () => {
+    if (onStartAmnesiaChallenge) {
+      onStartAmnesiaChallenge(message.text);
     }
   };
   
@@ -119,6 +132,17 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
                 title={isSpeaking ? 'Stop speaking' : 'Read aloud'}
               >
                 {isSpeaking ? '🔇 Stop' : '🔊 Listen'}
+              </button>
+            )}
+
+            {/* 🆕 AMNESIA CHALLENGE BUTTON - Only show if solution and amnesia enabled */}
+            {message.metadata?.isSolution && isAmnesiaEnabled && onStartAmnesiaChallenge && (
+              <button
+                onClick={handleAmnesiaChallenge}
+                className="inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-gradient-to-r from-purple-500 to-indigo-500 text-white hover:shadow-lg transition-all hover:scale-105 animate-pulse"
+                title="Test your memory!"
+              >
+                🧠 Start Amnesia Challenge
               </button>
             )}
           </div>
