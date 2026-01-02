@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "think-first-ai"
-  }
+    "default": "think-first-ai",
+    "thinkfirstAI": "think-first-ai"
+  },
+  "targets": {},
+  "etags": {}
 }

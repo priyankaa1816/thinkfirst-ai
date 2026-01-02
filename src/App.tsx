@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
@@ -6,6 +5,7 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import Chat from './pages/Chat';
 import History from './pages/History';
+import PracticePage from './pages/PracticePage';
 import { auth } from './firebase';
 
 const App: React.FC = () => {
@@ -28,6 +28,7 @@ const App: React.FC = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/chat/:sessionId" element={<Chat />} />
             <Route path="/history" element={<History />} />
+            <Route path="/practice" element={<PracticePage />} />
           </Route>
         )}
       </Routes>

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { auth } from '../firebase';
@@ -9,6 +8,7 @@ const Navbar: React.FC = () => {
   const navItems = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'History', path: '/history' },
+    { label: '🧠 Brain Scanner', path: '/practice' },
   ];
 
   return (
@@ -19,6 +19,7 @@ const Navbar: React.FC = () => {
             <Link to="/dashboard" className="flex-shrink-0 flex items-center">
               <span className="text-xl font-bold text-indigo-600">ThinkFirst AI</span>
             </Link>
+
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {navItems.map((item) => (
                 <Link
@@ -35,9 +36,12 @@ const Navbar: React.FC = () => {
               ))}
             </div>
           </div>
+
           <div className="flex items-center">
-             <span className="text-sm text-gray-500 mr-4 hidden md:block">{auth.currentUser?.email}</span>
-             <button
+            <span className="text-sm text-gray-500 mr-4 hidden md:block">
+              {auth.currentUser?.email}
+            </span>
+            <button
               onClick={() => auth.signOut()}
               className="ml-4 px-3 py-1 text-sm text-gray-700 hover:text-indigo-600 font-medium"
             >
