@@ -17,6 +17,8 @@ import ReconstructionEditor from '../components/chat/ReconstructionEditor';
 // 🆕 FIRESTORE & AUTH IMPORTS
 import { saveAmnesiaAttempt, updateAmnesiaStats } from '../services/firebase/firestore';
 import { auth } from '../firebase';
+import { useSandbox } from '../hooks/useSandbox';
+import { techFacts } from '../data/techFacts';
 
 const Chat: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -34,6 +36,10 @@ const Chat: React.FC = () => {
   const amnesiaMode = useAmnesiaMode();
   const { checkMemory, loading: isCheckingMemory } = useAmnesiaCheck();
   const [memoryCheckResult, setMemoryCheckResult] = useState<any>(null);
+  const [showLaunchButton, setShowLaunchButton] = useState(false); 
+  const sandbox = useSandbox(sessionId || '');
+  const [randomFact, setRandomFact] = useState('Loading tech fact...');
+
 
   // Auto-fill input when voice transcription completes
   useEffect(() => {
@@ -49,12 +55,23 @@ const Chat: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  useEffect(() => {
+    setRandomFact(techFacts[Math.floor(Math.random() * techFacts.length)]);
+  }, []);
 
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
     sendMessage(inputText);
     setInputText('');
+    setShowLaunchButton(false);
+  };
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const question = e.target.value;
+    setInputText(question);
+    
+    // Show button when coding detected
+    setShowLaunchButton(sandbox.detectCodeQuestion(question));
   };
 
   // 🆕 HANDLE AMNESIA CHALLENGE START
@@ -303,14 +320,16 @@ const Chat: React.FC = () => {
       )}
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4">
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="text-6xl mb-4">🤖</div>
-              <p className="text-xl text-gray-700">Hello! I'm ThinkFirst AI. How can I help you learn today?</p>
-            </div>
-          </div>
+      <div className="flex-1 overflow-y-auto p-6 space-y-4 relative">
+  {messages.length === 0 ? (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-center max-w-2xl mx-auto">
+        <div className="text-2xl md:text-3xl font-bold text-blue-600 mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 p-8 rounded-3xl shadow-2xl border-2 border-blue-100 animate-pulse">
+           {randomFact}
+        </div>
+        <p className="text-xl text-gray-700">Hello! I'm ThinkFirst AI. How can I help you learn today?</p>
+      </div>
+    </div>
         ) : (
           messages.map((m) => (
             <MessageBubble 
@@ -332,6 +351,17 @@ const Chat: React.FC = () => {
 
       {/* Input Area with Voice */}
       <div className="bg-white border-t border-gray-200 p-4">
+        {/* ✅ LAUNCH SANDBOX BUTTON */}
+        {showLaunchButton && (
+          <div className="mb-4 p-4 bg-emerald-50 border-2 border-emerald-200 rounded-xl shadow-md">
+            <button 
+              onClick={sandbox.showEditor}
+              className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white py-4 px-6 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center"
+            >
+              Launch Sandbox
+            </button>
+          </div>
+        )}
         <form onSubmit={handleSend} className="flex items-center space-x-2">
           {/* 🎤 MIC BUTTON */}
           {isSupported && (
@@ -353,9 +383,9 @@ const Chat: React.FC = () => {
           <input
             type="text"
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={handleInputChange}
             disabled={sending || isListening}
-            placeholder={isListening ? "🎤 Listening..." : "Type your message or use voice..."}
+            placeholder={isListening ? "🎤 Listening..." : "Type your message... (try 'Sandbox')" }
             className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all disabled:bg-gray-100"
           />
           <button
@@ -369,16 +399,66 @@ const Chat: React.FC = () => {
 
         {/* Help Text */}
         <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-          <p>In learning mode, I'll provide hints first to help you solve it yourself!</p>
+          <p>In learning mode, I'll provide hints first! Type "Sandbox" if you want to open quick code editor → Launch Sandbox ➡️</p>
           {!isSupported && (
             <p className="text-amber-600">💡 Voice input works in Chrome, Edge, Safari</p>
           )}
         </div>
       </div>
+       {/* Code Editor - UNCHANGED */}
+       {sandbox.isOpen && (
+        <div className="fixed inset-0 bg-black/80 z-[1000] flex items-center justify-center p-4">
+          <div className="bg-gray-900 text-white w-full max-w-6xl h-[85vh] rounded-xl flex flex-col shadow-2xl">
+            <div className="p-6 border-b border-gray-700 flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              </div>
+              <select 
+                value={sandbox.language} 
+                onChange={(e) => sandbox.setLanguage(e.target.value)}
+                className="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-600"
+              >
+                <option value="python">Python 3</option>
+                
+                <option value="cpp">C++</option>
+                <option value="c"> C</option>
+              </select>
+              <div className="flex space-x-2">
+                <button 
+                  onClick={sandbox.runCode} 
+                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 px-6 py-2 rounded-lg"
+                >
+                  Run Code
+                </button>
+                <button 
+                  onClick={sandbox.hideEditor} 
+                  className="w-10 h-10 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center justify-center"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 flex overflow-hidden">
+              <textarea
+                value={sandbox.code}
+                onChange={(e) => sandbox.setCode(e.target.value)}
+                placeholder="print('Hello World!')"
+                className="flex-1 bg-gray-900 text-white p-6 font-mono text-sm resize-none outline-none"
+              />
+              <div className="w-1/2 bg-black p-6 font-mono text-sm overflow-auto text-green-400 border-l border-gray-700">
+                <div className="text-gray-400 mb-2">▶ Console Output</div>
+                <pre>{sandbox.output || 'Ready to run code...'}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-
+   
 export default Chat;
 
 
