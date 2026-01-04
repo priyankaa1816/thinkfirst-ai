@@ -622,16 +622,12 @@ Be encouraging but honest. Score 90-100 = excellent recall, 70-89 = good, 50-69 
 @app.post("/api/execute", response_model=ExecuteCodeResponse)
 async def execute_code(
     request: ExecuteCodeRequest,
-    user: dict = Depends(verify_firebase_token)  # ✅ Added authentication
 ):
     """
     Execute code in multiple languages with proper security
     Supports: Python, JavaScript, Java, C++, C
     """
     try:
-        uid = user["uid"]
-        logger.info(f"💻 Code execution request from user: {uid} | Language: {request.language}")
-        
         import time
         start_time = time.time()
         
