@@ -1,4 +1,3 @@
-// src/services/firestore.ts
 import {
   collection,
   addDoc,
@@ -12,18 +11,11 @@ import {
   orderBy,
   Timestamp,
   setDoc,
-  increment, // ← ADD THIS IMPORT
+  increment,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { ChatSession, ChatMessage } from '../../types/index';
 
-
-// ========== SESSIONS ==========
-
-
-/**
- * Create a new chat session
- */
 export const createSession = async (
   userId: string,
   title: string
@@ -43,10 +35,6 @@ export const createSession = async (
   }
 };
 
-
-/**
- * Get all sessions for a user
- */
 export const getUserSessions = async (userId: string): Promise<ChatSession[]> => {
   try {
     const q = query(
@@ -66,9 +54,6 @@ export const getUserSessions = async (userId: string): Promise<ChatSession[]> =>
 };
 
 
-/**
- * Get a single session by ID
- */
 export const getSession = async (sessionId: string): Promise<ChatSession | null> => {
   try {
     const docRef = doc(db, 'sessions', sessionId);
@@ -83,10 +68,6 @@ export const getSession = async (sessionId: string): Promise<ChatSession | null>
   }
 };
 
-
-/**
- * Update a session
- */
 export const updateSession = async (
   sessionId: string,
   updates: Partial<ChatSession>
@@ -103,13 +84,8 @@ export const updateSession = async (
   }
 };
 
-
-/**
- * Delete a session and all its messages
- */
 export const deleteSession = async (sessionId: string): Promise<void> => {
   try {
-    // Delete all messages in this session
     const messagesQuery = query(
       collection(db, 'messages'),
       where('sessionId', '==', sessionId)
@@ -119,7 +95,6 @@ export const deleteSession = async (sessionId: string): Promise<void> => {
     await Promise.all(deletePromises);
 
 
-    // Delete the session
     await deleteDoc(doc(db, 'sessions', sessionId));
   } catch (error) {
     console.error('Error deleting session:', error);
@@ -128,12 +103,6 @@ export const deleteSession = async (sessionId: string): Promise<void> => {
 };
 
 
-// ========== MESSAGES ==========
-
-
-/**
- * Add a message to a session
- */
 export const addMessage = async (
   sessionId: string,
   message: Omit<ChatMessage, 'id'>
@@ -146,7 +115,6 @@ export const addMessage = async (
     });
 
 
-    // Update session message count and updatedAt
     const sessionRef = doc(db, 'sessions', sessionId);
     const sessionSnap = await getDoc(sessionRef);
     if (sessionSnap.exists()) {
@@ -166,9 +134,6 @@ export const addMessage = async (
 };
 
 
-/**
- * Get all messages for a session
- */
 export const getSessionMessages = async (sessionId: string): Promise<ChatMessage[]> => {
   try {
     const q = query(
@@ -187,13 +152,6 @@ export const getSessionMessages = async (sessionId: string): Promise<ChatMessage
   }
 };
 
-
-// ========== PROGRESS TRACKING ==========
-
-
-/**
- * Update user progress
- */
 export const updateUserProgress = async (
   userId: string,
   updates: {
@@ -209,7 +167,6 @@ export const updateUserProgress = async (
 
 
     if (progressSnap.exists()) {
-      // Update existing progress
       const current = progressSnap.data();
       await updateDoc(progressRef, {
         totalQuestions: updates.totalQuestions ?? current.totalQuestions ?? 0,
@@ -219,7 +176,6 @@ export const updateUserProgress = async (
         updatedAt: Date.now(),
       });
     } else {
-      // Create new progress document
       await setDoc(progressRef, {
         userId,
         totalQuestions: updates.totalQuestions ?? 0,
@@ -236,10 +192,6 @@ export const updateUserProgress = async (
   }
 };
 
-
-/**
- * Get user progress
- */
 export const getUserProgress = async (userId: string) => {
   try {
     const progressRef = doc(db, 'progress', userId);
@@ -250,14 +202,11 @@ export const getUserProgress = async (userId: string) => {
       return progressSnap.data();
     }
 
-
-    // Return default progress if none exists
     return {
       totalQuestions: 0,
       hintsUsed: 0,
       solutionsUnlocked: 0,
       currentStreak: 0,
-      // 🆕 ADD: Default effort-based fields
       problemsTriedBeforeSolution: 0,
       hintsUsedThisWeek: 0,
       solutionsAfterEffort: 0,
@@ -270,10 +219,6 @@ export const getUserProgress = async (userId: string) => {
   }
 };
 
-
-/**
- * Increment a progress metric
- */
 export const incrementProgress = async (
   userId: string,
   metric: 'totalQuestions' | 'hintsUsed' | 'solutionsUnlocked' | 'currentStreak'
@@ -298,22 +243,12 @@ export const incrementProgress = async (
   }
 };
 
-
-// ========== 🆕 EFFORT-BASED PROGRESS TRACKING (NEW FUNCTIONS) ==========
-
-
-/**
- * Track when user makes effort before seeing solution
- * Only counts if attemptCount >= 2
- */
 export const trackProblemEffort = async (
   userId: string, 
   attemptCount: number
 ): Promise<void> => {
   try {
     const progressRef = doc(db, 'progress', userId);
-    
-    // Only count if they made 2+ attempts before solution
     if (attemptCount >= 2) {
       const progressSnap = await getDoc(progressRef);
       
@@ -321,11 +256,10 @@ export const trackProblemEffort = async (
         await updateDoc(progressRef, {
           problemsTriedBeforeSolution: increment(1),
           solutionsAfterEffort: increment(1),
-          effortScore: increment(attemptCount), // Add total attempts
+          effortScore: increment(attemptCount), 
           updatedAt: Date.now(),
         });
       } else {
-        // Create new document if doesn't exist
         await setDoc(progressRef, {
           userId,
           totalQuestions: 0,
@@ -348,10 +282,6 @@ export const trackProblemEffort = async (
   }
 };
 
-
-/**
- * Track weekly hint usage (resets every 7 days)
- */
 export const trackWeeklyHint = async (userId: string): Promise<void> => {
   try {
     const progressRef = doc(db, 'progress', userId);
@@ -364,7 +294,6 @@ export const trackWeeklyHint = async (userId: string): Promise<void> => {
       const progress = progressSnap.data();
       const lastReset = progress.lastWeekReset || 0;
       
-      // Reset weekly counter if 7 days passed
       if (now - lastReset > weekInMs) {
         await updateDoc(progressRef, {
           hintsUsedThisWeek: 1,
@@ -372,14 +301,12 @@ export const trackWeeklyHint = async (userId: string): Promise<void> => {
           updatedAt: Date.now(),
         });
       } else {
-        // Just increment
         await updateDoc(progressRef, {
           hintsUsedThisWeek: increment(1),
           updatedAt: Date.now(),
         });
       }
     } else {
-      // Create new document
       await setDoc(progressRef, {
         userId,
         totalQuestions: 0,
@@ -401,10 +328,6 @@ export const trackWeeklyHint = async (userId: string): Promise<void> => {
   }
 };
 
-
-/**
- * Get effort-based stats for dashboard
- */
 export const getEffortStats = async (userId: string) => {
   try {
     const progressRef = doc(db, 'progress', userId);
@@ -421,7 +344,7 @@ export const getEffortStats = async (userId: string) => {
     }
     
     const progress = progressSnap.data();
-    const solutionsUnlocked = progress.solutionsUnlocked || 1; // Avoid divide by 0
+    const solutionsUnlocked = progress.solutionsUnlocked || 1;
     
     return {
       problemsTriedBeforeSolution: progress.problemsTriedBeforeSolution || 0,
@@ -435,11 +358,7 @@ export const getEffortStats = async (userId: string) => {
     throw error;
   }
 };
-// ========== 🧠 AMNESIA MODE TRACKING (NEW FUNCTIONS) ==========
 
-/**
- * Save an amnesia reconstruction attempt
- */
 export const saveAmnesiaAttempt = async (
   userId: string,
   attemptData: {
@@ -454,14 +373,13 @@ export const saveAmnesiaAttempt = async (
   }
 ): Promise<string> => {
   try {
-    // Save to amnesiaAttempts collection
     const attemptRef = await addDoc(collection(db, 'amnesiaAttempts'), {
       userId,
       ...attemptData,
       timestamp: Date.now(),
     });
 
-    console.log('✅ Saved amnesia attempt:', attemptRef.id);
+    console.log('Saved amnesia attempt:', attemptRef.id);
     return attemptRef.id;
   } catch (error) {
     console.error('Error saving amnesia attempt:', error);
@@ -469,9 +387,6 @@ export const saveAmnesiaAttempt = async (
   }
 };
 
-/**
- * Get user's amnesia mode statistics
- */
 export const getAmnesiaStats = async (userId: string) => {
   try {
     const progressRef = doc(db, 'progress', userId);
@@ -504,9 +419,6 @@ export const getAmnesiaStats = async (userId: string) => {
   }
 };
 
-/**
- * Update amnesia mode stats after an attempt
- */
 export const updateAmnesiaStats = async (
   userId: string,
   logicScore: number,
@@ -520,14 +432,11 @@ export const updateAmnesiaStats = async (
 
     if (progressSnap.exists()) {
       const progress = progressSnap.data();
-      
-      // Calculate new values
       const totalAttempts = (progress.amnesiaTotalAttempts || 0) + 1;
       const currentStreak = (progress.amnesiaCurrentStreak || 0);
       const bestStreak = progress.amnesiaBestStreak || 0;
       const previousAverage = progress.amnesiaAverageScore || 0;
       
-      // Update streak
       let newStreak = currentStreak;
       let newBestStreak = bestStreak;
       
@@ -535,10 +444,9 @@ export const updateAmnesiaStats = async (
         newStreak = currentStreak + 1;
         newBestStreak = Math.max(newStreak, bestStreak);
       } else {
-        newStreak = 0; // Reset streak on fail
+        newStreak = 0; 
       }
       
-      // Calculate rolling average score
       const newAverage = Math.round(
         ((previousAverage * (totalAttempts - 1)) + logicScore) / totalAttempts
       );
@@ -553,10 +461,8 @@ export const updateAmnesiaStats = async (
         updatedAt: now,
       });
     } else {
-      // Create new progress document
       await setDoc(progressRef, {
         userId,
-        // Existing fields
         totalQuestions: 0,
         hintsUsed: 0,
         solutionsUnlocked: 0,
@@ -566,7 +472,6 @@ export const updateAmnesiaStats = async (
         solutionsAfterEffort: 0,
         lastWeekReset: now,
         effortScore: 0,
-        // Amnesia fields
         amnesiaTotalAttempts: 1,
         amnesiaCurrentStreak: passed ? 1 : 0,
         amnesiaBestStreak: passed ? 1 : 0,
@@ -578,16 +483,13 @@ export const updateAmnesiaStats = async (
       });
     }
 
-    console.log('✅ Updated amnesia stats for user:', userId);
+    console.log('Updated amnesia stats for user:', userId);
   } catch (error) {
     console.error('Error updating amnesia stats:', error);
     throw error;
   }
 };
 
-/**
- * Get recent amnesia attempts for a user
- */
 export const getRecentAmnesiaAttempts = async (
   userId: string,
   limit: number = 10

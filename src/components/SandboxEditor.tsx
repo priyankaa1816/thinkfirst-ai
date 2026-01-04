@@ -22,7 +22,6 @@ function solve(input) {
 console.log(solve([1, 2, 3]));`);
   }, []);
 
-  // ✅ JS ONLY - REAL EXECUTION, NO FAKE SIMULATION
   const handleRun = () => {
     setOutput('Running...\n');
     try {
@@ -31,9 +30,9 @@ console.log(solve([1, 2, 3]));`);
       console.log = (...args) => logs.push(args.map(arg => String(arg)).join(' '));
       new Function(code)();
       console.log = oldLog;
-      setOutput(logs.length ? logs.map(l => `>>> ${l}`).join('\n') : '✅ Executed (no output)');
+      setOutput(logs.length ? logs.map(l => `>>> ${l}`).join('\n') : 'Executed (no output)');
     } catch (e) {
-      setOutput(`❌ ${String(e)}`);
+      setOutput(`${String(e)}`);
     }
   };
 
@@ -77,13 +76,13 @@ console.log(solve([1, 2, 3]));`);
             onClick={handleRun}
             className="flex-1 bg-green-500 hover:bg-green-600 text-white py-4 px-6 rounded-xl font-bold"
           >
-            ▶️ Run Code
+            Run Code
           </button>
           <button 
             onClick={handleSave}
             className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-4 px-6 rounded-xl font-bold"
           >
-            💾 Save
+            Save
           </button>
         </div>
       </div>

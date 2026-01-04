@@ -32,7 +32,6 @@ const StudyBanner: React.FC<StudyBannerProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className="text-4xl animate-pulse">🧠</div>
             <div>
               <h2 className="text-2xl font-bold">Answer Amnesia Mode Activated!</h2>
               <p className="text-purple-100">Study this solution carefully. You'll reconstruct it from memory!</p>
@@ -81,7 +80,7 @@ const StudyBanner: React.FC<StudyBannerProps> = ({
 
         {/* Tip */}
         <div className="mt-4 p-3 bg-white/10 rounded-lg text-sm">
-          <span className="font-semibold">💡 Tip:</span> Focus on the <strong>logic and approach</strong>, not memorizing exact syntax!
+          <span className="font-semibold">Tip:</span> Focus on the <strong>logic and approach</strong>, not memorizing exact syntax!
         </div>
       </div>
     </div>

@@ -1,5 +1,3 @@
-// src/lib/analytics.ts
-
 declare global {
   interface Window {
     gtag?: (...args: any[]) => void;
@@ -17,10 +15,9 @@ export const trackEvent = (
     return;
   }
   window.gtag?.("event", name, params || {});
-  console.log('📊 GA4 Event:', name, params);
+  console.log('GA4 Event:', name, params);
 };
 
-// Core ThinkFirst AI metrics
 export const trackHintShown = (topic: string, attempt: number) =>
   trackEvent("hint_shown", { topic, attempt });
 

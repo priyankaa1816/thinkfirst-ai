@@ -18,23 +18,20 @@ export function runBrainScanner(attempts: ProblemAttempt[]) {
 
   const avgTime = totalTime / attempts.length;
 
-  // 🚨 Stress pattern
   if (signErrors >= 3) {
-    insights.push("🚨 DANGER: You ALWAYS flip signs under stress");
+    insights.push("DANGER: You ALWAYS flip signs under stress");
   }
 
-  // ⚠️ Weakness
   if (formulaErrors >= 2) {
-    insights.push("⚠️ WEAKNESS: Quadratic formula = instant panic");
+    insights.push("WEAKNESS: Quadratic formula = instant panic");
   }
 
-  // ✅ Strength
   if (avgTime < 90) {
-    insights.push("✅ GENIUS: You spot patterns 3x faster than average");
+    insights.push("GENIUS: You spot patterns 3x faster than average");
   }
 
   if (insights.length === 0) {
-    insights.push("🧠 Stable thinking pattern detected. No major stress signals.");
+    insights.push("Stable thinking pattern detected. No major stress signals.");
   }
 
   return insights;

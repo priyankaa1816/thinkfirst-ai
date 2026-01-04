@@ -3,7 +3,6 @@ import { useState, useCallback } from "react";
 
 export const useSandbox = (sessionId: string) => {
   const [isOpen, setIsOpen] = useState(false);
-  // Dynamic default based on language
 const getDefaultCode = (lang: string) => {
     const defaults = {
       python: 'This is a low-powered sandbox to try out simple commands- Please delete this placeholder text and enter your code to continue',
@@ -15,13 +14,11 @@ const getDefaultCode = (lang: string) => {
     return defaults[lang as keyof typeof defaults] || '';
   };
   
-  // Then use:
   const [code, setCode] = useState(getDefaultCode('python'));
   
   const [output, setOutput] = useState('');
   const [language, setLanguage] = useState('python');
 
-  // ✅ BACKEND URL - Development vs Production
   const getBackendUrl = () => {
     if (import.meta.env.DEV) {
       return 'http://localhost:8000/api/execute';
@@ -31,7 +28,6 @@ const getDefaultCode = (lang: string) => {
   };
 
   const detectCodeQuestion = useCallback((question: string) => {
-    //const keywords = ['code', 'function', 'write', 'implement', 'algorithm', 'program'];
     const keywords = ['sandbox','Sandbox'];
     return keywords.some(k => question.toLowerCase().includes(k));
   }, []);
@@ -43,7 +39,7 @@ const getDefaultCode = (lang: string) => {
     setOutput('Running...');
     try {
       const backendUrl = getBackendUrl();
-      console.log('🚀 Calling:', backendUrl); 
+      console.log('Calling:', backendUrl); 
       
       const res = await fetch(backendUrl, {
         method: 'POST',
@@ -58,7 +54,7 @@ const getDefaultCode = (lang: string) => {
       const result = await res.json();
       setOutput(result.output || result.error || 'No output');
     } catch (error: any) {
-      setOutput(`❌ ${error.message}`);
+      setOutput(`${error.message}`);
       console.error('Code execution failed:', error);
     }
   };

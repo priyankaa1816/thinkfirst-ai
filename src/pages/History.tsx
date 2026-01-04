@@ -1,4 +1,3 @@
-// src/pages/History.tsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { auth } from '../firebase';
@@ -89,7 +88,6 @@ const History: React.FC = () => {
         </div>
       ) : (
         <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-100">
-          <div className="text-5xl mb-4">📓</div>
           <h3 className="text-xl font-bold text-gray-900 mb-1">No sessions yet</h3>
           <p className="text-gray-500">Your solved problems will appear here.</p>
           <Link to="/dashboard" className="mt-4 inline-block text-indigo-600 font-bold hover:underline">

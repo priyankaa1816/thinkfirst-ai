@@ -8,7 +8,7 @@ const Navbar: React.FC = () => {
   const navItems = [
     { label: 'Dashboard', path: '/dashboard' },
     { label: 'History', path: '/history' },
-    { label: '🧠 Brain Scanner', path: '/practice' },
+    { label: 'Brain Scanner', path: '/practice' },
   ];
 
   return (

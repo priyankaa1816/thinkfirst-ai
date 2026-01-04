@@ -26,10 +26,9 @@ const ReconstructionEditor: React.FC<ReconstructionEditorProps> = ({
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-3xl">🧠</span>
               <div>
                 <h2 className="text-xl font-bold">Reconstruct from Memory</h2>
-                <p className="text-purple-100 text-sm">Write the solution you just studied. No peeking! 🔒</p>
+                <p className="text-purple-100 text-sm">Write the solution you just studied. No peeking!</p>
               </div>
             </div>
             <button
@@ -55,7 +54,7 @@ const ReconstructionEditor: React.FC<ReconstructionEditorProps> = ({
 
           {/* Tips */}
           <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-            <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2">💡 Remember:</p>
+            <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2">Remember:</p>
             <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1 list-disc list-inside">
               <li>Focus on the <strong>main algorithm/approach</strong></li>
               <li>Variable names don't need to match exactly</li>
@@ -79,7 +78,7 @@ const ReconstructionEditor: React.FC<ReconstructionEditorProps> = ({
             disabled={isChecking || !reconstruction.trim()}
             className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-2 px-6 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isChecking ? '🔍 Checking Your Memory...' : '✅ Check My Memory'}
+            {isChecking ? 'Checking Your Memory...' : 'Check My Memory'}
           </button>
         </div>
       </div>

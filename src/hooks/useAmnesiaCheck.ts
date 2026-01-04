@@ -46,13 +46,13 @@ export const useAmnesiaCheck = () => {
         }
       );
 
-      console.log('🧠 Amnesia check result:', response.data);
+      console.log('Amnesia check result:', response.data);
       return response.data;
 
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Unknown error occurred';
       setError(errorMessage);
-      console.error('❌ Amnesia check error:', errorMessage);
+      console.error('Amnesia check error:', errorMessage);
       return null;
     } finally {
       setLoading(false);

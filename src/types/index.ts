@@ -1,5 +1,3 @@
-// src/types.ts
-
 export interface ChatSession {
   id: string;
   userId: string;
@@ -10,7 +8,7 @@ export interface ChatSession {
   createdAt: number;
   updatedAt: number;
   messageCount: number;
-  topicTracker?: { [key: string]: any }; // ← ADD: For topic persistence
+  topicTracker?: { [key: string]: any }; 
 }
 
 export interface ChatMessage {
@@ -30,38 +28,32 @@ export interface ChatMessage {
   mode?: 'learning' | 'chat';
 }
 
-// 🆕 ADD: User type (if not already present)
 export interface User {
   uid: string;
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
   createdAt: number;
-  progress: UserProgress; // ← Links to progress tracking
+  progress: UserProgress; 
 }
 
-// 🆕 UPDATE: UserProgress with Effort-Based fields
 export interface UserProgress {
-  // Existing fields (keep these)
   questionsAsked: number;
   hintsUsed: number;
   solutionsUnlocked: number;
   totalSessions: number;
-  
-  // 🆕 EFFORT-BASED TRACKING (NEW FIELDS)
-  problemsTriedBeforeSolution: number;  // Problems where they made 2+ attempts before solution
-  hintsUsedThisWeek: number;            // Weekly hint counter (auto-resets)
-  solutionsAfterEffort: number;         // Solutions unlocked after 2+ attempts
-  lastWeekReset: number;                // Timestamp for weekly reset (milliseconds)
-  effortScore: number;                  // Total attempts made (higher = more effort)
+  problemsTriedBeforeSolution: number;  
+  hintsUsedThisWeek: number;            
+  solutionsAfterEffort: number;         
+  lastWeekReset: number;                
+  effortScore: number;
 }
 
-// 🆕 ADD: Effort Stats type (for dashboard display)
 export interface EffortStats {
   problemsTriedBeforeSolution: number;
   hintsUsedThisWeek: number;
   solutionsAfterEffort: number;
   effortScore: number;
-  averageEffortPerSolution: number;     // Calculated: effortScore / solutionsUnlocked
+  averageEffortPerSolution: number;     
 }
 

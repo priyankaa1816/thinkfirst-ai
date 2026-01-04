@@ -7,9 +7,8 @@ export const useVoiceInput = () => {
   const [recognition, setRecognition] = useState<any>(null);
 
   useEffect(() => {
-    // Check if browser supports speech recognition
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      console.warn('⚠️ Speech recognition not supported in this browser');
+      console.warn('Speech recognition not supported in this browser');
       setIsSupported(false);
       return;
     }
@@ -18,24 +17,20 @@ export const useVoiceInput = () => {
 
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognitionInstance = new SpeechRecognition();
-
-    // Configuration
-    recognitionInstance.continuous = false;  // Stop after one result
-    recognitionInstance.interimResults = false;  // Only final results
-    recognitionInstance.lang = 'en-US';  // Language
+    recognitionInstance.continuous = false; 
+    recognitionInstance.interimResults = false; 
+    recognitionInstance.lang = 'en-US';
     recognitionInstance.maxAlternatives = 1;
 
-    // When speech is recognized
     recognitionInstance.onresult = (event: any) => {
       const speechResult = event.results[0][0].transcript;
-      console.log('🎤 Recognized:', speechResult);
+      console.log('Recognized:', speechResult);
       setTranscript(speechResult);
       setIsListening(false);
     };
 
-    // On error
     recognitionInstance.onerror = (event: any) => {
-      console.error('❌ Speech recognition error:', event.error);
+      console.error('Speech recognition error:', event.error);
       setIsListening(false);
       
       if (event.error === 'no-speech') {
@@ -45,15 +40,13 @@ export const useVoiceInput = () => {
       }
     };
 
-    // When recognition ends
     recognitionInstance.onend = () => {
-      console.log('🎤 Recognition ended');
+      console.log('Recognition ended');
       setIsListening(false);
     };
 
     setRecognition(recognitionInstance);
 
-    // Cleanup
     return () => {
       if (recognitionInstance) {
         recognitionInstance.stop();
@@ -67,7 +60,7 @@ export const useVoiceInput = () => {
       setIsListening(true);
       try {
         recognition.start();
-        console.log('🎤 Started listening...');
+        console.log('Started listening...');
       } catch (error) {
         console.error('Failed to start recognition:', error);
         setIsListening(false);
@@ -79,7 +72,7 @@ export const useVoiceInput = () => {
     if (recognition && isListening) {
       recognition.stop();
       setIsListening(false);
-      console.log('🎤 Stopped listening');
+      console.log('Stopped listening');
     }
   };
 

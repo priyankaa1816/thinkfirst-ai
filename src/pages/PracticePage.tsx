@@ -4,8 +4,6 @@ import { ProblemAttempt } from "../types/BrainMetrics";
 
 export default function PracticePage() {
   const { insights, scan } = useBrainScanner();
-
-  // ✅ MOCK DATA (end-of-day 5 problems)
   const attempts: ProblemAttempt[] = [
     {
       problemId: "1",
@@ -47,7 +45,7 @@ export default function PracticePage() {
   return (
     <div className="p-6">
       <h1 className="text-xl font-bold mb-4">
-        🧠 Brain Pattern Scanner
+        Brain Pattern Scanner
       </h1>
 
       <button

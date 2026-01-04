@@ -8,7 +8,7 @@ export default function BrainScannerCard({ insights }: Props) {
   return (
     <div className="mt-6 p-4 rounded-xl border border-purple-500 bg-purple-50">
       <h2 className="text-lg font-semibold mb-3">
-        🧠 Brain Pattern Scanner
+        Brain Pattern Scanner
       </h2>
 
       <ul className="space-y-2">

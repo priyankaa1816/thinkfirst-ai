@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { signInWithPopup } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase';
@@ -17,7 +16,6 @@ const Home: React.FC = () => {
       navigate('/dashboard');
     } catch (err: any) {
       console.error("Sign in failed", err);
-      // Detailed error mapping for user feedback
       if (err.code === 'auth/api-key-not-valid' || err.code === 'auth/invalid-api-key') {
         setError("Firebase Configuration Error: The API key is invalid for this project. Please ensure your project settings are correct in firebase.ts.");
       } else if (err.code === 'auth/popup-closed-by-user') {

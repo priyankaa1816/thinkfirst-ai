@@ -1,4 +1,3 @@
-// src/components/SandboxButton.tsx
 import React from "react";
 import { useSandbox } from "../hooks/useSandbox";
 import { ChatMessage } from "../types";
@@ -6,7 +5,7 @@ import { ChatMessage } from "../types";
 interface SandboxButtonProps {
   messages: ChatMessage[];
   sessionId: string;
-  isSolutionUnlocked: boolean; // From parent component
+  isSolutionUnlocked: boolean;
   onClick?: () => void;
 }
 
@@ -19,7 +18,7 @@ export const SandboxButton: React.FC<SandboxButtonProps> = ({
   const { launchSandbox, isGeneratingSandbox } = useSandbox(sessionId);
 
   if (!isSolutionUnlocked) {
-    return null; // DON'T RENDER - additive only
+    return null; 
   }
 
   const handleLaunch = () => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { VOICE_MODES, VoiceMode } from '../../hooks/useTextToSpeech';
+import { VOICE_MODES, VoiceMode } from '../../hooks/useTexttoSpeech';
 
 interface VoiceSelectorProps {
   selectedMode: VoiceMode;
@@ -17,7 +17,6 @@ const VoiceSelector: React.FC<VoiceSelectorProps> = ({ selectedMode, onChangeMod
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-all text-sm"
       >
-        <span className="text-lg">{VOICE_MODES[selectedMode].emoji}</span>
         <span className="font-medium text-gray-700">{VOICE_MODES[selectedMode].name}</span>
         <span className="text-gray-400">{isOpen ? '▲' : '▼'}</span>
       </button>
@@ -34,7 +33,7 @@ const VoiceSelector: React.FC<VoiceSelectorProps> = ({ selectedMode, onChangeMod
           {/* Menu */}
           <div className="absolute top-full mt-2 right-0 bg-white border border-gray-200 rounded-xl shadow-lg p-2 z-20 min-w-[280px]">
             <div className="text-xs font-semibold text-gray-500 px-3 py-2 mb-1">
-              🎭 Choose Voice Mode
+              Choose Voice Mode
             </div>
             
             {(Object.keys(VOICE_MODES) as VoiceMode[]).map((mode) => {
@@ -55,7 +54,6 @@ const VoiceSelector: React.FC<VoiceSelectorProps> = ({ selectedMode, onChangeMod
                   }}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{modeData.emoji}</span>
                     <div>
                       <div className="font-semibold text-gray-900">{modeData.name}</div>
                       <div className="text-xs text-gray-500">{modeData.description}</div>

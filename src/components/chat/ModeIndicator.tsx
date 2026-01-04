@@ -13,7 +13,6 @@ const ModeIndicator: React.FC<ModeIndicatorProps> = ({ mode }) => {
       isLearning ? 'bg-indigo-50 border-b border-indigo-100' : 'bg-gray-50 border-b border-gray-100'
     }`}>
       <div className="flex items-center space-x-2">
-        <span className="text-xl">{isLearning ? '🧠' : '💬'}</span>
         <span className={`text-sm font-semibold uppercase tracking-wider ${
           isLearning ? 'text-indigo-700' : 'text-gray-600'
         }`}>

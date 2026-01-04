@@ -15,18 +15,17 @@ export const AmnesiaModeToggle: React.FC<AmnesiaModeToggleProps> = ({
 }) => {
   return (
     <div className="bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-700 rounded-lg p-4 mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🧠</span>
-          <div>
-            <h3 className="font-semibold text-purple-900 dark:text-purple-100">
-              Answer Amnesia Mode
-            </h3>
-            <p className="text-sm text-purple-700 dark:text-purple-300">
-              Test your memory after seeing solutions
-            </p>
-          </div>
+    <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center gap-2">
+        <div>
+          <h3 className="text-xl font-bold text-purple-900 flex items-center gap-2">
+            Answer Amnesia Mode
+          </h3>
+          <p className="text-sm text-purple-900 ">
+            Test your memory after seeing solutions
+          </p>
         </div>
+      </div>
         
         <label className="relative inline-flex items-center cursor-pointer">
           <input
