@@ -105,6 +105,18 @@ class CodeRequest(BaseModel):
     code: str
     language: str
 
+class ExecuteCodeResponse(BaseModel):
+    output: str
+    error: Optional[str] = None
+    executionTime: Optional[float] = None
+    language: str
+    success: bool
+
+class ExecuteCodeRequest(BaseModel):
+    code: str
+    language: str
+    input: Optional[str] = None
+
 # ==================== FIREBASE AUTH VERIFICATION ====================
 
 async def verify_firebase_token(
@@ -606,76 +618,243 @@ Be encouraging but honest. Score 90-100 = excellent recall, 70-89 = good, 50-69 
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to check memory: {str(e)}"
         )
-@app.post("/api/execute")
-async def execute_code(request: CodeRequest):
+
+@app.post("/api/execute", response_model=ExecuteCodeResponse)
+async def execute_code(
+    request: ExecuteCodeRequest,
+    user: dict = Depends(verify_firebase_token)  # ✅ Added authentication
+):
+    """
+    Execute code in multiple languages with proper security
+    Supports: Python, JavaScript, Java, C++, C
+    """
     try:
+        uid = user["uid"]
+        logger.info(f"💻 Code execution request from user: {uid} | Language: {request.language}")
+        
+        import time
+        start_time = time.time()
+        
         temp_id = str(uuid.uuid4())[:8]
         os.makedirs("exec_tmp", exist_ok=True)
         
-        # ✅ FIXED PYTHON - Use FULL PATH, NO cwd
-        if request.language == "python":
+        output = ""
+        error_msg = None
+        success = False
+
+        # PYTHON EXECUTION
+        if request.language.lower() in ["python", "py"]:
             filepath = f"exec_tmp/{temp_id}.py"
-            with open(filepath, 'w') as f: f.write(request.code)
+            
+            # Add input handling if provided
+            code_to_run = request.code
+            if request.input:
+                code_to_run = f"import sys\nsys.stdin = open('exec_tmp/{temp_id}_input.txt', 'r')\n{request.code}"
+                with open(f"exec_tmp/{temp_id}_input.txt", 'w') as f:
+                    f.write(request.input)
+            
+            with open(filepath, 'w') as f:
+                f.write(code_to_run)
+            
             full_path = os.path.abspath(filepath)
-            result = subprocess.run(['python3', full_path], capture_output=True, text=True, timeout=10)
-            output = result.stdout + result.stderr
-        
-        elif request.language == "javascript":
+            result = subprocess.run(
+                ['python3', full_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            output = result.stdout
+            if result.returncode != 0:
+                error_msg = result.stderr
+            else:
+                success = True
+
+        # JAVASCRIPT EXECUTION
+        elif request.language.lower() in ["javascript", "js", "node"]:
             filepath = f"exec_tmp/{temp_id}.js"
-            with open(filepath, 'w') as f: f.write(request.code)
+            
+            code_to_run = request.code
+            if request.input:
+                code_to_run = f"const input = `{request.input}`;\n{request.code}"
+            
+            with open(filepath, 'w') as f:
+                f.write(code_to_run)
+            
             full_path = os.path.abspath(filepath)
-            result = subprocess.run(['node', full_path], capture_output=True, text=True, timeout=10)
-            output = result.stdout + result.stderr
-        
-        elif request.language == "java":
+            result = subprocess.run(
+                ['node', full_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            output = result.stdout
+            if result.returncode != 0:
+                error_msg = result.stderr
+            else:
+                success = True
+
+        # JAVA EXECUTION
+        elif request.language.lower() == "java":
             filepath = f"exec_tmp/{temp_id}.java"
-            with open(filepath, 'w') as f: f.write(request.code)
+            
+            with open(filepath, 'w') as f:
+                f.write(request.code)
+            
             full_path = os.path.abspath(filepath)
-            compile_result = subprocess.run(['javac', full_path], capture_output=True, text=True, timeout=10, cwd="exec_tmp")
+            
+            # Compile
+            compile_result = subprocess.run(
+                ['javac', full_path],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd="exec_tmp"
+            )
+            
             if compile_result.returncode == 0:
                 class_name = os.path.splitext(os.path.basename(filepath))[0]
-                result = subprocess.run(['java', class_name], capture_output=True, text=True, timeout=10, cwd="exec_tmp")
-                output = result.stdout + result.stderr
-            else:
-                output = f"Compile Error:\n{compile_result.stderr}"
-        
-        elif request.language == "cpp":
-            filepath = f"exec_tmp/{temp_id}.cpp"
-            with open(filepath, 'w') as f: f.write(request.code)
-            full_path = os.path.abspath(filepath)
-            out_path = os.path.abspath(f"exec_tmp/{temp_id}_out")
-            compile_result = subprocess.run([
-                'clang++', '-std=c++11', '-o', out_path, full_path
-            ], capture_output=True, text=True, timeout=10, cwd="exec_tmp")
-            if compile_result.returncode == 0:
-                result = subprocess.run([out_path], capture_output=True, text=True, timeout=10, cwd="exec_tmp")
-                output = result.stdout + result.stderr
-            else:
-                output = f"Compile Error:\n{compile_result.stderr}"
-        
-        elif request.language == "c":
-            filepath = f"exec_tmp/{temp_id}.c"
-            with open(filepath, 'w') as f: f.write(request.code)
-            full_path = os.path.abspath(filepath)
-            out_path = os.path.abspath(f"exec_tmp/{temp_id}_out")
-            compile_result = subprocess.run(['clang', '-o', out_path, full_path], 
-                                          capture_output=True, text=True, timeout=10, cwd="exec_tmp")
-            if compile_result.returncode == 0:
-                result = subprocess.run([out_path], capture_output=True, text=True, timeout=10, cwd="exec_tmp")
-                output = result.stdout + result.stderr
-            else:
-                output = f"Compile Error:\n{compile_result.stderr}"
-        else:
-            output = "Language not supported"
-        
-        # Cleanup
-        for ext in ['.py', '.js', '.java', '.cpp', '.c', '_out', '.class']:
-            try: os.remove(f"exec_tmp/{temp_id}{ext}")
-            except: pass
                 
-        return {"output": output}
+                # Run with input if provided
+                run_args = ['java', class_name]
+                stdin_input = request.input if request.input else None
+                
+                result = subprocess.run(
+                    run_args,
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    cwd="exec_tmp",
+                    input=stdin_input
+                )
+                output = result.stdout
+                if result.returncode != 0:
+                    error_msg = result.stderr
+                else:
+                    success = True
+            else:
+                error_msg = f"Compilation Error:\n{compile_result.stderr}"
+
+        # C++ EXECUTION
+        elif request.language.lower() in ["cpp", "c++"]:
+            filepath = f"exec_tmp/{temp_id}.cpp"
+            
+            with open(filepath, 'w') as f:
+                f.write(request.code)
+            
+            full_path = os.path.abspath(filepath)
+            out_path = os.path.abspath(f"exec_tmp/{temp_id}_out")
+            
+            # Compile
+            compile_result = subprocess.run(
+                ['g++', '-std=c++17', '-o', out_path, full_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if compile_result.returncode == 0:
+                stdin_input = request.input if request.input else None
+                result = subprocess.run(
+                    [out_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    input=stdin_input
+                )
+                output = result.stdout
+                if result.returncode != 0:
+                    error_msg = result.stderr
+                else:
+                    success = True
+            else:
+                error_msg = f"Compilation Error:\n{compile_result.stderr}"
+
+        # C EXECUTION
+        elif request.language.lower() == "c":
+            filepath = f"exec_tmp/{temp_id}.c"
+            
+            with open(filepath, 'w') as f:
+                f.write(request.code)
+            
+            full_path = os.path.abspath(filepath)
+            out_path = os.path.abspath(f"exec_tmp/{temp_id}_out")
+            
+            # Compile
+            compile_result = subprocess.run(
+                ['gcc', '-o', out_path, full_path],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if compile_result.returncode == 0:
+                stdin_input = request.input if request.input else None
+                result = subprocess.run(
+                    [out_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    input=stdin_input
+                )
+                output = result.stdout
+                if result.returncode != 0:
+                    error_msg = result.stderr
+                else:
+                    success = True
+            else:
+                error_msg = f"Compilation Error:\n{compile_result.stderr}"
+        
+        else:
+            error_msg = f"Unsupported language: {request.language}"
+            output = ""
+
+        # Cleanup
+        for ext in ['.py', '.js', '.java', '.cpp', '.c', '_out', '.class', '_input.txt']:
+            try:
+                os.remove(f"exec_tmp/{temp_id}{ext}")
+            except:
+                pass
+        
+        execution_time = round(time.time() - start_time, 3)
+        
+        # Log execution to Firestore
+        try:
+            db.collection("codeExecutions").add({
+                "userId": uid,
+                "language": request.language,
+                "code": request.code[:500],  # First 500 chars only
+                "success": success,
+                "executionTime": execution_time,
+                "timestamp": firestore.SERVER_TIMESTAMP
+            })
+        except Exception as firestore_error:
+            logger.error(f"Firestore logging error: {firestore_error}")
+        
+        return ExecuteCodeResponse(
+            output=output or "No output",
+            error=error_msg,
+            executionTime=execution_time,
+            language=request.language,
+            success=success
+        )
+
+    except subprocess.TimeoutExpired:
+        logger.error(f"Code execution timeout for user: {uid}")
+        return ExecuteCodeResponse(
+            output="",
+            error="Execution timed out (10 seconds limit)",
+            executionTime=10.0,
+            language=request.language,
+            success=False
+        )
+    
     except Exception as e:
-        return {"error": str(e)}
+        logger.error(f"Code execution error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Code execution failed: {str(e)}"
+        )
+
 # Run with: uvicorn main:app --host 0.0.0.0 --port $PORT
 if __name__ == "__main__":
     import uvicorn
