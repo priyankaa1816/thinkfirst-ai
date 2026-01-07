@@ -1,11 +1,13 @@
 "use client";
 import { useState, useCallback } from "react";
+import { auth } from "../firebase"; 
 
 export const useSandbox = (sessionId: string) => {
   const [isOpen, setIsOpen] = useState(false);
-const getDefaultCode = (lang: string) => {
+
+  const getDefaultCode = (lang: string) => {
     const defaults = {
-      python: 'This is a low-powered sandbox to try out simple commands- Please delete this placeholder text and enter your code to continue',
+      python: 'print("Hello World! This is a low-powered sandbox to try out simple commands")',
       javascript: 'console.log("Hello World! This is a low-powered js sandbox to try out simple commands");',
       java: 'class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello Java!");\n    }\n}',
       cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello C++! This is a low-powered sandbox to try out simple commands" << endl;\n    return 0;\n}',
@@ -15,7 +17,6 @@ const getDefaultCode = (lang: string) => {
   };
   
   const [code, setCode] = useState(getDefaultCode('python'));
-  
   const [output, setOutput] = useState('');
   const [language, setLanguage] = useState('python');
 
@@ -38,23 +39,35 @@ const getDefaultCode = (lang: string) => {
   const runCode = async () => {
     setOutput('Running...');
     try {
+      const user = auth.currentUser;
+      if (!user) {
+        setOutput('Error: Please log in to run code');
+        return;
+      }
+
+      const token = await user.getIdToken();
+      
       const backendUrl = getBackendUrl();
       console.log('Calling:', backendUrl); 
       
       const res = await fetch(backendUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify({ code, language })
       });
       
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || `HTTP ${res.status}`);
       }
       
       const result = await res.json();
       setOutput(result.output || result.error || 'No output');
     } catch (error: any) {
-      setOutput(`${error.message}`);
+      setOutput(`Error: ${error.message}`);
       console.error('Code execution failed:', error);
     }
   };
