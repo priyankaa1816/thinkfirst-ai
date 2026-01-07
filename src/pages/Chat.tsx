@@ -18,7 +18,7 @@ import { techFacts } from '../data/techFacts';
 
 const Chat: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const { messages, session, loading, sending, sendMessage, conversationContext } = useChat(sessionId || '');
+  const { messages, session, loading, sending, sendMessage, conversationContext, timeTravelData,  elapsedTime,  toggleTimeTravel  } = useChat(sessionId || '');
   const [inputText, setInputText] = React.useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { isListening, transcript, isSupported, startListening, stopListening } = useVoiceInput();
@@ -29,6 +29,7 @@ const Chat: React.FC = () => {
   const [showLaunchButton, setShowLaunchButton] = useState(false); 
   const sandbox = useSandbox(sessionId || '');
   const [randomFact, setRandomFact] = useState('Loading tech fact...');
+  const [isHintsExpanded, setIsHintsExpanded] = useState(false);
 
 
   useEffect(() => {
@@ -273,6 +274,183 @@ const Chat: React.FC = () => {
 
       {/* Mode Status */}
       <ModeIndicator mode={session?.mode || 'chat'} />
+      {/* Time-Travel Mode UI */}
+      {conversationContext.isLearningMode && (
+        <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-200">
+          {/* Toggle Switch - Always Visible */}
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center space-x-3">
+              <span className="text-lg">⏰</span>
+              <div>
+                <h3 className="font-semibold text-gray-800">Time-Travel Hints</h3>
+                <p className="text-xs text-gray-600">Hints unlock over time as you try</p>
+              </div>
+            </div>
+            
+            {/* Toggle Button */}
+            <button
+              onClick={toggleTimeTravel}
+              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
+                timeTravelData.isActive ? 'bg-indigo-600' : 'bg-gray-300'
+              }`}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                  timeTravelData.isActive ? 'translate-x-7' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Collapsible Hints Panel (only when active) */}
+          {timeTravelData.isActive && (
+            <div className="px-6 pb-4">
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                {/* Collapsible Header */}
+                <button
+                  onClick={() => setIsHintsExpanded(!isHintsExpanded)}
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-sm font-medium text-gray-700">
+                      🕐 Time-Travel Progress
+                    </span>
+                    <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full font-semibold">
+                      {timeTravelData.unlockedHints.length}/4 unlocked
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <span className="text-lg font-bold text-indigo-600">
+                      {Math.floor(elapsedTime / 60)}:{(elapsedTime % 60).toString().padStart(2, '0')}
+                    </span>
+                    <svg 
+                      className={`w-5 h-5 text-gray-500 transition-transform ${isHintsExpanded ? 'rotate-180' : ''}`}
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+
+                {/* Collapsible Content */}
+                {isHintsExpanded && (
+                  <div className="px-4 pb-4 pt-2 border-t border-gray-200 space-y-2 animate-slideDown">
+                    {/* Hint 1 */}
+                    <div className={`flex items-center space-x-3 p-3 rounded-lg transition-all ${
+                      timeTravelData.unlockedHints.includes(1) 
+                        ? 'bg-green-50 border border-green-200' 
+                        : 'bg-gray-50 border border-gray-200'
+                    }`}>
+                      <span className="text-xl">
+                        {timeTravelData.unlockedHints.includes(1) ? '🔓' : '🔒'}
+                      </span>
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${
+                          timeTravelData.unlockedHints.includes(1) ? 'text-green-700' : 'text-gray-500'
+                        }`}>
+                          Hint 1: Conceptual
+                        </p>
+                        <p className="text-xs text-gray-500">30s OR 1 attempt</p>
+                      </div>
+                      {timeTravelData.unlockedHints.includes(1) && (
+                        <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded animate-pulse">
+                          READY ✨
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Hint 2 */}
+                    <div className={`flex items-center space-x-3 p-3 rounded-lg transition-all ${
+                      timeTravelData.unlockedHints.includes(2) 
+                        ? 'bg-green-50 border border-green-200' 
+                        : 'bg-gray-50 border border-gray-200'
+                    }`}>
+                      <span className="text-xl">
+                        {timeTravelData.unlockedHints.includes(2) ? '🔓' : '🔒'}
+                      </span>
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${
+                          timeTravelData.unlockedHints.includes(2) ? 'text-green-700' : 'text-gray-500'
+                        }`}>
+                          Hint 2: Approach
+                        </p>
+                        <p className="text-xs text-gray-500">60s AND 1 attempt</p>
+                      </div>
+                      {timeTravelData.unlockedHints.includes(2) && (
+                        <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded">
+                          UNLOCKED
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Hint 3 */}
+                    <div className={`flex items-center space-x-3 p-3 rounded-lg transition-all ${
+                      timeTravelData.unlockedHints.includes(3) 
+                        ? 'bg-green-50 border border-green-200' 
+                        : 'bg-gray-50 border border-gray-200'
+                    }`}>
+                      <span className="text-xl">
+                        {timeTravelData.unlockedHints.includes(3) ? '🔓' : '🔒'}
+                      </span>
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${
+                          timeTravelData.unlockedHints.includes(3) ? 'text-green-700' : 'text-gray-500'
+                        }`}>
+                          Hint 3: Pseudocode
+                        </p>
+                        <p className="text-xs text-gray-500">90s AND 2 attempts</p>
+                      </div>
+                      {timeTravelData.unlockedHints.includes(3) && (
+                        <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded">
+                          UNLOCKED
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Solution */}
+                    <div className={`flex items-center space-x-3 p-3 rounded-lg transition-all ${
+                      timeTravelData.unlockedHints.includes(4) 
+                        ? 'bg-green-50 border border-green-200' 
+                        : 'bg-gray-50 border border-gray-200'
+                    }`}>
+                      <span className="text-xl">
+                        {timeTravelData.unlockedHints.includes(4) ? '🔓' : '🔒'}
+                      </span>
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${
+                          timeTravelData.unlockedHints.includes(4) ? 'text-green-700' : 'text-gray-500'
+                        }`}>
+                          Solution
+                        </p>
+                        <p className="text-xs text-gray-500">120s OR 3 attempts</p>
+                      </div>
+                      {timeTravelData.unlockedHints.includes(4) && (
+                        <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded">
+                          UNLOCKED
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Stats Footer */}
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-200">
+                      <span className="text-xs text-gray-600">
+                        🧪 Attempts: <span className="font-semibold">{timeTravelData.attemptCount}</span>
+                      </span>
+                      <span className="text-xs text-gray-600">
+                        🤔 Thinking: <span className="font-semibold">{elapsedTime}s</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
 
       {/* Learning Mode Indicator */}
       {conversationContext.isLearningMode && (

@@ -9,7 +9,17 @@ export interface ChatSession {
   updatedAt: number;
   messageCount: number;
   topicTracker?: { [key: string]: any }; 
+    timeTravelData?: TimeTravelContext;
 }
+
+export interface TimeTravelContext {
+  isActive: boolean;
+  questionStartTime: number | null;
+  attemptCount: number;
+  unlockedHints: number[];
+  thinkingTime: number;
+}
+
 
 export interface ChatMessage {
   id: string;

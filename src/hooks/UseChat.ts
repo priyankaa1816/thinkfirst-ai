@@ -9,7 +9,7 @@ import {
   trackProblemEffort,  
   trackWeeklyHint      
 } from '../services/firebase/firestore';
-import { ChatSession, ChatMessage } from '../types';
+import { ChatSession, ChatMessage, TimeTravelContext } from '../types';
 import {
   trackHintShown,
   trackSolutionUnlocked,
@@ -17,8 +17,8 @@ import {
   trackModeSwitched,
 } from "../lib/analytics";
 import axios from 'axios';
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
 
 interface ConversationContext {
   currentTopic: string | null;
@@ -42,7 +42,6 @@ interface GroqResponse {
     detectedIntent?: string;
   };
 }
-
 
 async function fetchWeather(city: string, country: string = "IN"): Promise<any> {
   try {
@@ -73,12 +72,12 @@ async function fetchNews(query: string): Promise<any> {
   try {
     const apiKey = import.meta.env.VITE_NEWS_API_KEY;
     if (!apiKey) {
-      console.warn(' News API key not configured');
+      console.warn('News API key not configured');
       return { error: "News API not configured" };
     }
     
     const url = `https://newsapi.org/v2/top-headlines?q=${query}&apiKey=${apiKey}`;
-    console.log(' Fetching news for:', query);
+    console.log('Fetching news for:', query);
     const response = await axios.get(url);
     
     const headlines = response.data.articles.slice(0, 3).map((article: any) => ({
@@ -92,7 +91,6 @@ async function fetchNews(query: string): Promise<any> {
     return { error: "Unable to fetch news data" };
   }
 }
-
 
 function analyzeContext(
   message: string,
@@ -237,7 +235,6 @@ function analyzeContext(
     
     return null;
   };
-  
 
   if (isGeneralChat && !isNewLearningQuestion) {
     console.log('Detected: General chat');
@@ -404,6 +401,17 @@ export const useChat = (sessionId: string) => {
   });
   
   const [topicTracker, setTopicTracker] = useState<TopicTracker>({});
+  
+  // Time-Travel Mode State
+  const [timeTravelData, setTimeTravelData] = useState<TimeTravelContext>({
+    isActive: false,
+    questionStartTime: null,
+    attemptCount: 0,
+    unlockedHints: [],
+    thinkingTime: 0,
+  });
+  
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -428,12 +436,53 @@ export const useChat = (sessionId: string) => {
     loadData();
   }, [sessionId]);
 
+  // Real-time timer for Time-Travel Mode
+  useEffect(() => {
+    if (!timeTravelData.isActive || !timeTravelData.questionStartTime) {
+      setElapsedTime(0);
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - timeTravelData.questionStartTime!) / 1000);
+      setElapsedTime(elapsed);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [timeTravelData.isActive, timeTravelData.questionStartTime]);
+
+  // Toggle Time-Travel Mode
+  const toggleTimeTravel = () => {
+    if (!timeTravelData.isActive) {
+      // Turn ON: Start timer
+      setTimeTravelData({
+        isActive: true,
+        questionStartTime: Date.now(),
+        attemptCount: 0,
+        unlockedHints: [],
+        thinkingTime: 0,
+      });
+      console.log('⏰ Time-Travel Mode ACTIVATED');
+    } else {
+      // Turn OFF: Reset
+      setTimeTravelData({
+        isActive: false,
+        questionStartTime: null,
+        attemptCount: 0,
+        unlockedHints: [],
+        thinkingTime: 0,
+      });
+      setElapsedTime(0);
+      console.log('⏰ Time-Travel Mode DEACTIVATED');
+    }
+  };
+
   const sendMessage = async (text: string) => {
     if (!sessionId || !auth.currentUser || !text.trim()) return;
-
     setSending(true);
 
     try {
+      // 1. Add user message
       const userMessage: Omit<ChatMessage, 'id'> = {
         role: 'user',
         text: text.trim(),
@@ -445,350 +494,207 @@ export const useChat = (sessionId: string) => {
       const userMessageId = await addMessage(sessionId, userMessage);
       setMessages(prev => [...prev, { ...userMessage, id: userMessageId }]);
 
+      // 2. Analyze context
       const { context: currentContext, updatedTracker } = analyzeContext(
-        text, 
-        messages, 
+        text,
+        messages,
         conversationContext,
         topicTracker
       );
-      
       setTopicTracker(updatedTracker);
-      
-      console.log('Context Analysis:', {
-        message: text.substring(0, 50),
-        currentTopic: currentContext.currentTopic,
-        attemptCount: currentContext.attemptCount,
-        isLearningMode: currentContext.isLearningMode
-      });
 
-      let realTimeData = "";
-      const msgLower = text.toLowerCase();
-      
-      const weatherPatterns = ["weather", "temperature", "how hot", "how cold", "climate", "forecast"];
-      if (weatherPatterns.some(pattern => msgLower.includes(pattern))) {
-        console.log('Weather request detected');
-        
-        let city = "Delhi";
-        const cityMatch = text.match(/in\s+([A-Za-z]+)/i) || 
-                          text.match(/at\s+([A-Za-z]+)/i) ||
-                          text.match(/weather\s+([A-Za-z]+)/i) ||
-                          text.match(/([A-Z][a-z]+)\s+weather/i);
-        
-        if (cityMatch) {
-          city = cityMatch[1];
-        }
-        
-        const weatherData = await fetchWeather(city);
-        console.log('Weather data:', weatherData);
-        
-        if (!weatherData.error) {
-          realTimeData = `\n\n[REAL-TIME WEATHER DATA - USE THIS IN YOUR RESPONSE]
-Current weather in ${weatherData.city}: 
-- Temperature: ${weatherData.temperature}°C (feels like ${weatherData.feelsLike}°C)
-- Condition: ${weatherData.condition}
-- Humidity: ${weatherData.humidity}%
+      // 3. Prepare Time-Travel Context
+      let timeTravelPayload: TimeTravelContext | null = null;
 
-Respond naturally using this information. Don't say you don't have access to real-time data!`;
-        }
-      }
-      
-      const newsPatterns = ["news", "latest", "current events", "happening", "today's", "recent"];
-      if (newsPatterns.some(pattern => msgLower.includes(pattern)) && !msgLower.includes("weather")) {
-        console.log('News request detected');
-        
-        const query = text.replace(/news|latest|about|what's|today's|recent/gi, "").trim() || "technology";
-        const newsData = await fetchNews(query);
-        console.log('News data:', newsData);
-        
-        if (!newsData.error && newsData.headlines && newsData.headlines.length > 0) {
-          const headlinesList = newsData.headlines
-            .map((h: any, i: number) => `${i + 1}. ${h.title}`)
-            .join('\n');
-          
-          realTimeData = `\n\n[REAL-TIME NEWS DATA - USE THIS IN YOUR RESPONSE]
-Latest news headlines:
-${headlinesList}
+      if (timeTravelData.isActive) {
+        const currentElapsed = timeTravelData.questionStartTime 
+          ? Math.floor((Date.now() - timeTravelData.questionStartTime) / 1000)
+          : 0;
 
-Respond naturally using these headlines. Don't say you don't have access to real-time data!`;
-        }
-      }
-      
-      let systemPrompt = `You are ThinkFirst AI, an intelligent daily-life chatbot that helps people learn by thinking first.
+        const msgLower = text.toLowerCase();
+        const followUpPatterns = ['hint', 'complexity', 'explain more', 'what do you mean', 'why', 'how does'];
+        const isFollowUp = followUpPatterns.some(pattern => msgLower.includes(pattern));
 
-**YOUR ABSOLUTE CORE RULES:**
-1. **NEVER GIVE DIRECT ANSWERS TO LEARNING QUESTIONS ON FIRST ASK** - This is your PRIMARY rule
-2. **BE A NORMAL CHATBOT** - For casual chat (greetings, general questions), respond naturally
-3. **DETECT REAL-TIME REQUESTS** - For weather/news, provide real-time data naturally
-4. **FOR LEARNING QUESTIONS** - Use progressive hints (0→1→2→3 attempts before solution)
-5. **RESPOND IN JSON FORMAT** - Always return valid JSON with required structure
+        // ✅ FIX: Always increment on user attempt in learning mode (not follow-ups)
+        const shouldIncrement = currentContext.isLearningMode && !isFollowUp && text.trim().length > 5;
+        const newAttemptCount = shouldIncrement
+          ? timeTravelData.attemptCount + 1 
+          : timeTravelData.attemptCount;
 
-**CRITICAL: You are NOT just a tutor, you are a daily-life assistant that:**
-- Chats normally about life, interests, feelings
-- Provides weather and news when asked
-- BUT when someone asks a solvable problem/homework/learning question, you guide them instead of solving it directly
+        // ✅ Create payload with new values FIRST
+        timeTravelPayload = {
+          isActive: true,
+          questionStartTime: timeTravelData.questionStartTime,
+          attemptCount: newAttemptCount,  // ✅ Use calculated value here
+          unlockedHints: timeTravelData.unlockedHints,
+          thinkingTime: timeTravelData.thinkingTime
+        };
 
-**BEHAVIOR:**
-
-**For General Chat (casual conversation):**
-- Answer naturally and conversationally
-- Be friendly, helpful, and engaging
-- No hints needed - just chat normally
-- Examples: "What's up?", "Tell me a joke", "I'm feeling sad", "What should I eat?"
-
-**For Real-Time Data (weather/news):**
-- Use provided real-time data naturally
-- Don't say you lack access to current data
-- Respond helpfully and directly`;
-      
-      if (currentContext.isLearningMode) {
-        const { attemptCount, currentTopic } = currentContext;
-        
-        systemPrompt += `
-
-**CURRENT MODE: LEARNING MODE**
-Topic: "${currentTopic}"
-Attempt: ${attemptCount}
-
-**PROGRESSIVE GUIDANCE:**
-`;
-        
-        if (attemptCount === 0) {
-          systemPrompt += `- This is ATTEMPT 0 - The user JUST ASKED the question
-- CRITICAL: DO NOT SOLVE IT! DO NOT GIVE THE ANSWER!
-- Your job: Give a small hint or ask what they know
-- Be supportive and encouraging
-- Examples:
-  * "Great question! What integration techniques have you learned?"
-  * "Interesting! Have you tried simplifying the expression first?"
-  * "Nice problem! What's your initial thought on approaching this?"
-- Set isHint: true, isSolution: false, mode: "learning"`;
-        } else if (attemptCount === 1) {
-          systemPrompt += `- This is ATTEMPT 1 - They've tried once
-- STILL NO COMPLETE SOLUTION!
-- Give a stronger hint: point to a technique, formula, or concept
-- Examples:
-  * "Good try! For integrals like this, try using [technique name]"
-  * "You're on the right track! Remember [relevant formula/concept]"
-- Set isHint: true, isSolution: false, mode: "learning"`;
-        } else if (attemptCount === 2) {
-          systemPrompt += `- This is ATTEMPT 2 - Third interaction
-- STILL NO COMPLETE SOLUTION!
-- Give detailed guidance: pseudocode, steps, or partial work
-- Show the approach but let them finish
-- Set isHint: true, isSolution: false, mode: "learning"`;
-        } else if (attemptCount === 3) {
-          systemPrompt += `- This is ATTEMPT 3 - Fourth interaction
-- STILL NO COMPLETE SOLUTION!
-- Give very detailed guidance: more specific steps
-- Almost show the solution but hold back the final answer
-- Set isHint: true, isSolution: false, mode: "learning"`;
-        } else {
-          systemPrompt += `- This is ATTEMPT 4+ - Fifth+ interaction or they gave up
-- NOW you can give the COMPLETE SOLUTION
-- Provide the full answer with step-by-step explanation
-- Show all work and explain the reasoning
-- Set isHint: false, isSolution: true, mode: "learning"`;
-        }
-        
-        systemPrompt += `
-
-**IMPORTANT REMINDERS:**
-- If user asks follow-up questions (complexity, "why", "how does that work"), answer directly without incrementing attempts
-- Each NEW learning topic has its own separate attempt counter
-- Switching between topics preserves their individual attempt counts
-- "Give me the answer" only unlocks solution if they've already made genuine attempts`;
-      }
-      
-      systemPrompt += `
-
-**ABSOLUTELY CRITICAL - READ THIS:**
-- At attempt 0, 1, 2, 3: DO NOT provide the final answer or complete solution
-- Only at attempt 4+ can you reveal the full solution
-- Think of yourself as a patient teacher who guides, not solves
-
-**REQUIRED JSON RESPONSE FORMAT:**
-You must respond with valid JSON containing these fields:
-{
-  "text": "your response text here",
-  "mode": "learning" or "chat",
-  "isHint": true or false,
-  "isSolution": true or false
-}
-
-**CODE FORMATTING INSIDE JSON:**
-When including code blocks in the text field, use ESCAPED backticks and newlines:
-- Use \\n for line breaks
-- Use \\\`\\\`\\\` for triple backticks
-
-Example JSON with code:
-{
-  "text": "Here's a Python solution:\\n\\\`\\\`\\\`python\\ndef example():\\n    return 'hello'\\n\\\`\\\`\\\`",
-  "mode": "learning",
-  "isHint": false,
-  "isSolution": true
-}
-
-This ensures valid JSON while preserving code formatting.`;
-
-
-
-
-
-      try {
-        const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-        
-        if (!BACKEND_URL) {
-          throw new Error('VITE_BACKEND_URL is not configured');
-        }
-
-        const idToken = await auth.currentUser!.getIdToken();
-
-        console.log('Calling FastAPI Backend...');
-
-        const conversationHistory = messages.map(m => ({
-          role: m.role,
-          text: m.text
+        // ✅ Update state for UI display (happens after response too)
+        setTimeTravelData(prev => ({
+          ...prev,
+          attemptCount: newAttemptCount
         }));
 
-        const backendResponse = await axios.post(
-          `${BACKEND_URL}/api/chat`,
-          {
-            message: text + realTimeData, 
-            conversationHistory,
-            conversationContext: currentContext,
-            sessionId
-          },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${idToken}`
-            }
-          }
-        );
-
-        console.log('FastAPI raw response:', backendResponse.data);
-
-        let aiResponse: GroqResponse;
-        try {
-          aiResponse = {
-            text: backendResponse.data.text,
-            mode: backendResponse.data.mode,
-            isHint: backendResponse.data.isHint,
-            isSolution: backendResponse.data.isSolution
-          };
-          
-          console.log('Parsed AI response:', aiResponse);
-          
-          // Safety check (keep your existing safety logic)
-          if (currentContext.isLearningMode && currentContext.attemptCount < 4) {
-            if (aiResponse.isSolution === true) {
-              console.warn('AI tried to give solution too early! Forcing hint mode.');
-              aiResponse.isSolution = false;
-              aiResponse.isHint = true;
-              aiResponse.text = "Let me give you a hint first! " + aiResponse.text.split('\n').slice(0, 3).join('\n');
-            }
-          }
-          
-        } catch (parseError) {
-          console.error('Failed to parse FastAPI response:', parseError);
-          throw new Error('Invalid response from backend');
-        }
-
-
-        setConversationContext(currentContext);
-        console.log('Updated Context:', currentContext);
-
-        const topic = currentContext.currentTopic || "unknown_topic";
-        const attempt = currentContext.attemptCount ?? 0;
-
-        if (currentContext.isLearningMode) {
-          trackAttemptSubmitted(topic, attempt);
-        }
-
-        if (aiResponse.isHint) {
-          trackHintShown(topic, attempt);
-          await trackWeeklyHint(auth.currentUser.uid); 
-        }
-
-        if (aiResponse.isSolution) {
-          trackSolutionUnlocked(topic, attempt);
-          console.log(`SOLUTION UNLOCKED at attempt ${attempt}`);
-          await trackProblemEffort(auth.currentUser.uid, attempt);
-          console.log(`trackProblemEffort called with attempt: ${attempt}`);
-        }
-
-        if (aiResponse.mode) {
-          trackModeSwitched(aiResponse.mode);
-        }
-        
-        const aiMessage: Omit<ChatMessage, 'id'> = {
-          role: 'ai',
-          text: aiResponse.text,
-          timestamp: Date.now(),
-          senderId: 'ai',
-          createdAt: Date.now(),
-          metadata: {
-            isHint: aiResponse.isHint ?? false,
-            isSolution: aiResponse.isSolution ?? false,
-            detectedIntent: aiResponse.metadata?.detectedIntent ?? 'general_chat'
-          },
-          mode: aiResponse.mode || 'chat'
-        };
-
-        const aiMessageId = await addMessage(sessionId, aiMessage);
-        setMessages(prev => [...prev, { ...aiMessage, id: aiMessageId }]);
-
-        const newMode = aiResponse.mode || 'chat';
-        await updateSession(sessionId, { mode: newMode });
-        setSession(prev => prev ? { ...prev, mode: newMode } : null);
-
-        if (aiResponse.isHint) {
-          await incrementProgress(auth.currentUser.uid, 'hintsUsed');
-        }
-        if (aiResponse.isSolution) {
-          await incrementProgress(auth.currentUser.uid, 'solutionsUnlocked');
-        }
-
-      } catch (apiError) {
-        console.error('Groq API call failed:', apiError);
-        
-        const mockAiMessage: Omit<ChatMessage, 'id'> = {
-          role: 'ai',
-          text: `Oops! I'm having trouble connecting right now. \n\n**Your question:** "${text}"\n\n**Troubleshooting:**\n1. Check if VITE_GROQ_API_KEY is set in your .env file\n2. Verify your API key is valid at https://console.groq.com\n3. Check your internet connection\n\nTry again in a moment!`,
-          timestamp: Date.now(),
-          senderId: 'ai',
-          createdAt: Date.now(),
-          metadata: {
-            isHint: false,
-            isSolution: false,
-            detectedIntent: 'error'
-          },
-          mode: 'chat'
-        };
-
-        const mockMessageId = await addMessage(sessionId, mockAiMessage);
-        setMessages(prev => [...prev, { ...mockAiMessage, id: mockMessageId }]);
+        console.log('🚀 TIME-TRAVEL PAYLOAD:', {
+          isActive: timeTravelPayload.isActive,
+          elapsed: currentElapsed,
+          attemptCount: timeTravelPayload.attemptCount,
+          shouldIncrement: shouldIncrement,
+          unlocked: timeTravelPayload.unlockedHints
+        });
       }
 
-    } catch (error) {
-      console.error('Error sending message:', error);
+      // 4. Real-time data (weather/news)
+      let realTimeData = '';
+      const msgLower = text.toLowerCase();
       
-      const errorMessage: Omit<ChatMessage, 'id'> = {
+      if (msgLower.includes('weather')) {
+        const cityMatch = text.match(/weather in (\w+)/i);
+        if (cityMatch) {
+          const weather = await fetchWeather(cityMatch[1]);
+          if (!weather.error) {
+            realTimeData = `\n[WEATHER DATA: ${JSON.stringify(weather)}]`;
+          }
+        }
+      } else if (msgLower.includes('news')) {
+        const newsQuery = text.replace(/news|latest|today|current/gi, '').trim() || 'technology';
+        const news = await fetchNews(newsQuery);
+        if (!news.error && news.headlines) {
+          realTimeData = `\n[NEWS DATA: ${JSON.stringify(news.headlines)}]`;
+        }
+      }
+
+      // 5. Backend request
+      const idToken = await auth.currentUser!.getIdToken();
+
+      console.log('📤 SENDING TO BACKEND:', {
+        timeTravelContext: timeTravelPayload,  
+        conversationContext: currentContext
+      });
+
+      const backendResponse = await axios.post(`${BACKEND_URL}/api/chat`, {
+        message: text + realTimeData,
+        conversationHistory: messages.map(m => ({ role: m.role, text: m.text })),
+        conversationContext: currentContext,
+        sessionId,
+        timeTravelContext: timeTravelPayload 
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`
+        }
+      });
+
+      console.log('📥 Backend Response:', backendResponse.data);
+
+      // 6. Parse AI response
+      let aiResponse: GroqResponse;
+      try {
+        aiResponse = {
+          text: backendResponse.data.text,
+          mode: backendResponse.data.mode,
+          isHint: backendResponse.data.isHint,
+          isSolution: backendResponse.data.isSolution
+        };
+
+        // Safety check
+        if (currentContext.isLearningMode && currentContext.attemptCount < 4) {
+          if (aiResponse.isSolution === true) {
+            console.warn('⚠️ AI tried to give solution too early!');
+            aiResponse.isSolution = false;
+            aiResponse.isHint = true;
+            aiResponse.text = "Let me give you a hint first! " + aiResponse.text.split('.').slice(0, 3).join('.');
+          }
+        }
+      } catch (parseError) {
+        console.error('Failed to parse response:', parseError);
+        throw new Error('Invalid response from backend');
+      }
+
+      setConversationContext(currentContext);
+
+      // 7. Sync Time-Travel state from backend
+      if (backendResponse.data.timeTravelContext) {
+        const backendTT = backendResponse.data.timeTravelContext;
+        
+        console.log('🔄 Backend Time-Travel Update:', {
+          unlocked: backendTT.unlockedHints,
+          attempts: backendTT.attemptCount,
+          isActive: backendTT.isActive
+        });
+
+        // Check for newly unlocked hints
+        const newlyUnlocked = backendTT.unlockedHints.filter(
+          (hint: number) => !timeTravelData.unlockedHints.includes(hint)
+        );
+
+        if (newlyUnlocked.length > 0) {
+          console.log('🎉 NEW HINTS UNLOCKED:', newlyUnlocked);
+        }
+
+        // ✅ Update frontend state with backend's calculated values
+        setTimeTravelData(prev => ({
+          ...prev,
+          unlockedHints: backendTT.unlockedHints,  // ✅ Use backend's calculation
+          attemptCount: backendTT.attemptCount,     // ✅ Sync attempt count
+          isActive: backendTT.isActive              // ✅ Maintain active state
+        }));
+      }
+
+      // Analytics tracking
+      const topic = currentContext.currentTopic || 'unknown-topic';
+      const attempt = currentContext.attemptCount ?? 0;
+
+      if (currentContext.isLearningMode) {
+        trackAttemptSubmitted(topic, attempt);
+        if (aiResponse.isHint) {
+          trackHintShown(topic, attempt);
+          await trackWeeklyHint(auth.currentUser.uid);
+        }
+        if (aiResponse.isSolution) {
+          trackSolutionUnlocked(topic, attempt);
+          await trackProblemEffort(auth.currentUser.uid, attempt);
+        }
+      }
+
+      if (aiResponse.mode) {
+        trackModeSwitched(aiResponse.mode);
+      }
+
+      // Add AI message
+      const aiMessage: Omit<ChatMessage, 'id'> = {
         role: 'ai',
-        text: 'Sorry, something unexpected happened. Please check your connection and try again.',
+        text: aiResponse.text,
         timestamp: Date.now(),
         senderId: 'ai',
         createdAt: Date.now(),
         metadata: {
-          isHint: false,
-          isSolution: false,
-          detectedIntent: 'error'
+          isHint: aiResponse.isHint ?? false,
+          isSolution: aiResponse.isSolution ?? false,
+          detectedIntent: aiResponse.metadata?.detectedIntent ?? 'general-chat',
         },
-        mode: 'chat'
+        mode: aiResponse.mode === 'chat' ? 'chat' : 'learning'
       };
 
-      const errorMessageId = await addMessage(sessionId, errorMessage);
-      setMessages(prev => [...prev, { ...errorMessage, id: errorMessageId }]);
+      const aiMessageId = await addMessage(sessionId, aiMessage);
+      setMessages(prev => [...prev, { ...aiMessage, id: aiMessageId }]);
+
+      // Update session
+      const newMode = aiResponse.mode === 'chat' ? 'chat' : 'learning';
+      await updateSession(sessionId, { mode: newMode });
+      setSession(prev => prev ? { ...prev, mode: newMode } : null);
+
+      // Progress tracking
+      if (aiResponse.isHint) {
+        await incrementProgress(auth.currentUser.uid, 'hintsUsed');
+      }
+      if (aiResponse.isSolution) {
+        await incrementProgress(auth.currentUser.uid, 'solutionsUnlocked');
+      }
+
+    } catch (error) {
+      console.error('Error sending message:', error);
     } finally {
       setSending(false);
     }
@@ -802,5 +708,8 @@ This ensures valid JSON while preserving code formatting.`;
     sendMessage,
     conversationContext,
     topicTracker,
+    timeTravelData,
+    elapsedTime,
+    toggleTimeTravel,
   };
 };
